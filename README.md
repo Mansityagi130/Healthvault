@@ -12,13 +12,26 @@
 
 ---
 
+## 📂 Project Versions
+
+This repository contains both versions of the HealthVault project organized into dedicated top-level folders:
+
+| Folder | Release Tag | Description | Key Capabilities |
+| :--- | :--- | :--- | :--- |
+| [📁 **Version 1**](./Version%201) | [`v1.0.0`](https://github.com/Mansityagi130/Healthvault/releases/tag/v1.0.0) | Original baseline release (Aug–Sep 2026) | Baseline multi-tier architecture, patient auth, clinical records CRUD |
+| [📁 **Version 2**](./Version%202) | [`v2.0.0`](https://github.com/Mansityagi130/Healthvault/releases/tag/v2.0.0) | Production-hardened release (Oct 2026) | Instant 24-hr QR sharing, ClamAV antivirus, emergency profile, appointments, PDF export |
+
+👉 **Click [📁 Version 1](./Version%201) or [📁 Version 2](./Version%202) above to explore the code for each version directly!**
+
+---
+
 ## 1. Project Purpose & Problem Statement
 
-In modern healthcare, patients face fragmented medical histories spread across paper prescriptions, hospital portals, disparate pathology lab portals, and diagnostic imaging centers. When seeking a second opinion, visiting an emergency room, or consulting an independent physician, patients struggle to compile and share their medical context quickly and securely.
+In modern healthcare, patients face fragmented medical histories spread across paper prescriptions, hospital portals, pathology labs, and diagnostic imaging centers. When seeking a second opinion, visiting an emergency room, or consulting an independent physician, patients struggle to compile and share their medical context quickly and securely.
 
 **HealthVault** solves this by putting patients in complete control of their medical records. Rather than forcing every clinic or hospital to adopt a centralized proprietary platform, HealthVault lets an individual:
 1. Store and organize their health history (prescriptions, diagnostic lab results, imaging scans, discharge summaries).
-2. Generate an **instant 24-hour secure QR code or direct link** to share records with any doctor or family member.
+2. Generate an **instant 24-hour secure QR code or direct link** to share records with any doctor or family member without selecting a doctor in advance.
 3. Maintain a critical **Emergency Medical Card** (blood group, severe allergies, chronic conditions, emergency contacts) instantly accessible to first responders.
 4. Schedule and manage healthcare appointments.
 5. Export branded PDF clinical summaries on demand.
@@ -48,8 +61,6 @@ In modern healthcare, patients face fragmented medical histories spread across p
 
 ## 4. Capability Status Matrix
 
-To provide total transparency for recruiters, developers, and reviewers, features are categorized by their implementation status:
-
 | Capability | Status | Notes |
 | :--- | :--- | :--- |
 | **Patient Health Records & Document Vault** | ✅ **Verified & Tested** | Multi-category uploads, preview, download |
@@ -64,32 +75,7 @@ To provide total transparency for recruiters, developers, and reviewers, feature
 
 ---
 
-## 5. Version History & Evolution
-
-HealthVault has evolved across two successive milestone releases:
-
-### [Version 1.0 (`v1.0.0`)](docs/VERSION_1.md)
-*Baseline Release (Aug–Sep 2026)*
-- Full-stack multi-tier architecture (Next.js, Express, PostgreSQL, Redis, Nginx).
-- Basic user registration, JWT authentication, and clinical record entry.
-- Initial clinical encounter prototypes and pre-registered doctor selection.
-- Foundational Docker Compose setup.
-
-### [Version 2.0 (`v2.0.0`)](docs/VERSION_2.md) *(Current Default)*
-*Production-Hardened & Pilot Release (Oct 2026)*
-- **Self-Serve QR Sharing**: Instant 24-hour patient-to-patient QR sharing with enforced recipient sign-in.
-- **Document Security**: ClamAV malware defense pipeline with fail-closed quarantine.
-- **Emergency Medical Profile**: First-responder emergency access with audit logging.
-- **Appointment Scheduling**: Multi-party appointment workflows.
-- **Production Hardening**: Fail-fast secrets validation (rejects weak/default keys), open-redirect mitigation, and 3 new Prisma migrations.
-- **Quality Assurance**: Expanded from 26 to 50 test suites (78+ passing integration/unit tests).
-
-👉 **For a line-by-line comparison, see [docs/VERSION_COMPARISON.md](docs/VERSION_COMPARISON.md).**  
-👉 **For detailed release notes, see [CHANGELOG.md](CHANGELOG.md).**
-
----
-
-## 6. Technology Stack
+## 5. Technology Stack
 
 - **Frontend**: Next.js 14+ (App Router), React 18, TypeScript, Tailwind CSS, Lucide React, `qrcode.react`, `@zxing/browser`.
 - **Backend**: Node.js, Express, TypeScript, Zod schema validation, Helmet, CORS, Rate Limiting, `pdfkit`, `nodemailer`, `@aws-sdk/client-s3`.
@@ -97,12 +83,12 @@ HealthVault has evolved across two successive milestone releases:
 - **Database & ORM**: PostgreSQL 16 Alpine, Prisma ORM 5 (26 migrations).
 - **Cache & Message Queue**: Redis 7 Alpine, BullMQ.
 - **Reverse Proxy**: Nginx Alpine (security headers, gzip/brotli compression, SSL termination).
-- **Testing**: Vitest `v3.2.7`, Supertest.
+- **Testing**: Vitest `v3.2.7`, Supertest (50 test suites, 78+ passing tests).
 - **DevOps**: Docker & Docker Compose.
 
 ---
 
-## 7. High-Level Architecture
+## 6. High-Level Architecture
 
 ```mermaid
 flowchart TD
@@ -129,15 +115,22 @@ flowchart TD
 
 ---
 
-## 8. Repository Structure
+## 7. Repository Structure
 
 ```text
 Healthvault/
-├── .env.example               # Safe environment configuration template
-├── .gitignore                  # Security-hardened git exclusion rules
-├── CHANGELOG.md                # Comprehensive release changelog
-├── README.md                   # This root documentation file
-├── docker-compose.yml          # Multi-container orchestration (6 services)
+├── Version 1/                  # Original Version 1 project files (v1.0.0)
+│   ├── backend/
+│   ├── frontend/
+│   ├── nginx/
+│   ├── docker-compose.yml
+│   └── README.md
+├── Version 2/                  # Production-hardened Version 2 project files (v2.0.0)
+│   ├── backend/
+│   ├── frontend/
+│   ├── nginx/
+│   ├── docker-compose.yml
+│   └── README.md
 ├── docs/                       # Project documentation
 │   ├── ARCHITECTURE.md         # Architecture, modules & data flow
 │   ├── BACKUP_AND_DISASTER_RECOVERY.md
@@ -146,32 +139,20 @@ Healthvault/
 │   ├── VERSION_1.md            # Version 1.0 release notes
 │   ├── VERSION_2.md            # Version 2.0 release notes
 │   └── VERSION_COMPARISON.md   # Side-by-side technical comparison
-├── backend/                    # Express TypeScript API service
-│   ├── Dockerfile
-│   ├── prisma/                 # Database schema & 26 migrations
-│   ├── src/                    # Controllers, routes, services, middleware
-│   └── tests/                  # 50 integration and unit test suites
-├── frontend/                   # Next.js 14 App Router web client
-│   ├── Dockerfile
-│   ├── app/                    # Auth, dashboard, hospital, provider, shared
-│   └── components/             # UI components, layout shells, QR display
-└── nginx/                      # Nginx reverse proxy configuration
+├── CHANGELOG.md                # Comprehensive release changelog
+├── LICENSE                     # MIT License
+├── README.md                   # This root documentation file
+└── .gitignore                  # Security-hardened git exclusion rules
 ```
 
 ---
 
-## 9. Prerequisites & Installation
+## 8. Quickstart (Running Version 2 via Docker)
 
-### Prerequisites
-- Docker Engine 24+ and Docker Compose v2+
-- Node.js 20 LTS (only if running outside Docker)
-- Minimum 4 GB RAM (at least 2.5 GB allocated to Docker for ClamAV definitions)
-
-### Quickstart (Docker Compose)
 ```bash
 # 1. Clone the repository
 git clone https://github.com/Mansityagi130/Healthvault.git
-cd Healthvault
+cd Healthvault/"Version 2"
 
 # 2. Configure environment
 cp .env.example .env
@@ -189,13 +170,14 @@ Visit [http://localhost](http://localhost) in your browser.
 
 ---
 
-## 10. Testing & Verification
+## 9. Testing & Verification
 
-Execute verified test suites against the backend service:
+Execute verified test suites against the Version 2 backend service:
 
 ```bash
+cd "Version 2/backend"
+
 # Run unit tests (redirect security, email transport, production secrets)
-cd backend
 npm test -- tests/redirect-security.unit.test.ts tests/email-transport.unit.test.ts tests/production-secrets-hardening.unit.test.ts
 
 # Run QR sharing integration test
@@ -209,7 +191,7 @@ npm run build
 
 ---
 
-## 11. Security & Privacy Principles
+## 10. Security & Privacy Principles
 
 1. **Patient Autonomy**: Medical records are never shared without explicit, revocable patient authorization.
 2. **Zero-Trust QR References**: Sharing tokens are cryptographically random, opaque identifiers with a 24-hour lifetime. No medical data or patient identity is encoded in QR code strings.
@@ -219,8 +201,10 @@ npm run build
 
 ---
 
-## 12. Documentation Index
+## 11. Documentation Index
 
+- [📁 Browse Version 1 Code](./Version%201)
+- [📁 Browse Version 2 Code](./Version%202)
 - [System Architecture](docs/ARCHITECTURE.md)
 - [Version 1 vs Version 2 Comparison](docs/VERSION_COMPARISON.md)
 - [Version 1.0 Release Notes](docs/VERSION_1.md)
@@ -232,6 +216,6 @@ npm run build
 
 ---
 
-## 13. License
+## 12. License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

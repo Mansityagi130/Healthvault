@@ -4,6 +4,7 @@
 
 # Dependencies
 node_modules/
+**/node_modules/
 .pnp
 .pnp.js
 
@@ -11,6 +12,9 @@ node_modules/
 .env
 .env.*
 !.env.example
+**/.env
+**/.env.*
+!**/.env.example
 *.pem
 *.key
 *.cert
@@ -18,36 +22,38 @@ node_modules/
 
 # Production build outputs
 .next/
+**/.next/
 dist/
+**/dist/
 build/
+**/build/
 coverage/
+**/coverage/
 *.tsbuildinfo
 
 # Runtime logs
 *.log
-backend/test_output.log
-backend/backend-server.log
-backend/backend-server-error.log
-frontend/frontend-server.log
-frontend/frontend-server-error.log
+**/*.log
 
 # Medical files, PHI, storage & uploads
 storage/
-backend/storage/
+**/storage/
 uploads/
-backend/uploads/
+**/uploads/
 
 # Generated Prisma client
 backend/src/generated/prisma/
+**/backend/src/generated/prisma/
 
 # Database dumps & local scratch SQL
 *.sql
-!backend/prisma/migrations/**/*.sql
-backend/temp.sql
+!**/migrations/**/*.sql
+**/temp.sql
 
 # Scratch scripts, temporary test runs, and logs
 scratch/
 test-results/
+**/test-results/
 
 # Editor and OS metadata
 .vscode/
