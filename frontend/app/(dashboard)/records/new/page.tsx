@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fetchWithAuth, getAccessToken } from "@/lib/api-client";
+import { fetchWithAuth, getAccessToken, API_URL } from "@/lib/api-client";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { ArrowLeft, Save, AlertCircle } from "lucide-react";
@@ -57,7 +57,7 @@ export default function NewRecordPage() {
         
         // We use fetch directly here to attach the auth header but send FormData natively
         const token = getAccessToken();
-        const uploadRes = await fetch(`/api/patient/records/${newRecord.id}/documents`, {
+        const uploadRes = await fetch(`${API_URL}/patient/records/${newRecord.id}/documents`, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${token}`

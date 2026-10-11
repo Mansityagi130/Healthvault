@@ -28,9 +28,9 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    
-    if (!formData.phone) {
-      setError("Please provide a phone number.");
+
+    if (!formData.email) {
+      setError("Please provide an email address.");
       return;
     }
 
@@ -41,10 +41,10 @@ export default function RegisterPage() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         password: formData.password,
-        phone: formData.phone,
+        email: formData.email,
       };
-      
-      if (formData.email) payload.email = formData.email;
+
+      if (formData.phone) payload.phone = formData.phone;
 
       const res = await fetchWithAuth("/auth/register", {
         method: "POST",
@@ -60,11 +60,7 @@ export default function RegisterPage() {
         throw new Error(data.error || "Registration failed");
       }
 
-      if (data.verificationRequired) {
-        router.push(`/register/verify?userId=${data.userId}`);
-      } else {
-        router.push("/login?registered=true");
-      }
+      router.push("/login?registered=true");
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message || "Something went wrong. Please try again.");
@@ -117,19 +113,19 @@ export default function RegisterPage() {
           <input
             type="email"
             name="email"
+            required
             value={formData.email}
             onChange={handleChange}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 text-slate-900"
-            placeholder="john@example.com (optional if phone provided)"
+            placeholder="john@example.com"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number (Optional)</label>
           <input
             type="tel"
             name="phone"
-            required
             value={formData.phone}
             onChange={handleChange}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 text-slate-900"

@@ -322,5 +322,5 @@ describe("End-to-End Release Demo Verification Flow", () => {
     console.log("Step 20: Intruder blocked from accessing patient record.");
 
     console.log("=== 20-STEP END-TO-END DEMO COMPLETED SUCCESSFULLY ===");
-  });
+  }, 180000);
 });

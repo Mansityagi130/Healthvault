@@ -35,7 +35,7 @@ export default function LabLayout({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (!user) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (!user) return <div suppressHydrationWarning className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   const navItems = [
     { name: "Dashboard", href: "/lab/dashboard", icon: LayoutDashboard },

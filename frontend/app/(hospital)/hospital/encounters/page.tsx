@@ -23,10 +23,10 @@ export default function HospitalEncountersPage() {
       setLoading(true);
       let hId = hospitalId;
       if (!hId) {
-        const hRes = await fetchWithAuth("/hospital/memberships");
-        const memberships = await hRes.json();
-        if (memberships && memberships.length > 0) {
-          hId = memberships[0].hospitalId;
+        const hRes = await fetchWithAuth("/hospitals");
+        const hospitals = await hRes.json();
+        if (Array.isArray(hospitals) && hospitals.length > 0) {
+          hId = hospitals[0].id;
           setHospitalId(hId);
         }
       }

@@ -68,21 +68,11 @@ export const passwordChangeLimiter = rateLimit({
   skip: shouldSkip,
 });
 
-// Limit phone OTP verification attempts
-export const phoneOtpVerifyLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
+// Limit FHIR export requests to 10 per hour
+export const fhirExportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
   max: 10,
-  message: { error: "Too many verification attempts, please try again later" },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: shouldSkip,
-});
-
-// Limit OTP resend requests
-export const phoneOtpResendLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: "Too many OTP resend requests, please try again later" },
+  message: { error: "Too many FHIR export requests, please try again after an hour" },
   standardHeaders: true,
   legacyHeaders: false,
   skip: shouldSkip,

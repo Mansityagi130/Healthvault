@@ -51,7 +51,11 @@ export default function LoginPage() {
       setAccessToken(data.accessToken);
       
       const roles = data.user?.roles || [];
-      if (roles.includes("DOCTOR")) {
+      if (roles.includes("HOSPITAL_ADMIN") || roles.includes("HOSPITAL_STAFF")) {
+        router.push("/hospital/dashboard");
+      } else if (roles.includes("LAB_TECHNICIAN") || roles.includes("LAB_ADMIN") || roles.includes("LAB_USER")) {
+        router.push("/lab/dashboard");
+      } else if (roles.includes("DOCTOR")) {
         router.push("/provider/dashboard");
       } else {
         router.push("/dashboard");

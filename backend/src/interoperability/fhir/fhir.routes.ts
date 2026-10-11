@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { authenticate as requireAuth } from '../../middleware/auth.middleware.js';
+import { fhirExportLimiter } from '../../middleware/rate-limiter.middleware.js';
 import { FhirService } from './fhir.service.js';
 import { databaseClient } from '../../config/database.js';
 
@@ -8,7 +9,7 @@ const prisma = databaseClient.getClient();
 
 router.use(requireAuth);
 
-router.get('/patient/:patientId/\\$export', async (req: Request, res: Response) => {
+router.get('/patient/:patientId/\\$export', fhirExportLimiter, async (req: Request, res: Response) => {
   try {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
     const authUser = (req as any).user;

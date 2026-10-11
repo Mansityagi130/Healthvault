@@ -88,16 +88,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navItems = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
     { name: "My Records", href: "/records", icon: FileText },
-    { name: "Documents", href: "/documents", icon: FolderOpen, active: false },
+    { name: "Documents", href: "/documents", icon: FolderOpen },
     { name: "Sharing & Consent", href: "/sharing", icon: Share2 },
     { name: "Lab Connections", href: "/lab-connections", icon: Pill },
-    { name: "Settings", href: "/settings", icon: Settings, active: false },
+    { name: "Settings", href: "/settings/security", icon: Settings },
   ];
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
+      <div suppressHydrationWarning className="flex h-screen w-full items-center justify-center bg-slate-50">
+        <div suppressHydrationWarning className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-200 border-t-teal-700"></div>
           <p className="text-sm font-medium text-slate-500">Loading your vault...</p>
         </div>

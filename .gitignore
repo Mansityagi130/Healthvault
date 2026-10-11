@@ -1,22 +1,56 @@
+# ==========================================
+# HealthVault Git Ignore Configuration
+# ==========================================
+
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Environment variables & secrets
 .env
 .env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+
+# Production build outputs
 .next/
 dist/
 build/
 coverage/
-*.log
-uploads/
-.vscode/
-.DS_Store
-Thumbs.db
-backend/src/generated/prisma/
-storage/
-backend/storage/
 *.tsbuildinfo
-backend/temp.sql
+
+# Runtime logs
+*.log
 backend/test_output.log
 backend/backend-server.log
 backend/backend-server-error.log
 frontend/frontend-server.log
 frontend/frontend-server-error.log
+
+# Medical files, PHI, storage & uploads
+storage/
+backend/storage/
+uploads/
+backend/uploads/
+
+# Generated Prisma client
+backend/src/generated/prisma/
+
+# Database dumps & local scratch SQL
+*.sql
+!backend/prisma/migrations/**/*.sql
+backend/temp.sql
+
+# Scratch scripts, temporary test runs, and logs
+scratch/
+test-results/
+
+# Editor and OS metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

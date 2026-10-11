@@ -49,6 +49,20 @@ async function verifyLabMembership(userId: string, labId: string) {
 }
 
 export const LabController = {
+  async getLabs(req: AuthRequest, res: Response) {
+    try {
+      const user = req.user!;
+      const memberships = await prisma.labMembership.findMany({
+        where: { userId: user.id, status: MembershipStatus.ACTIVE },
+        include: { lab: true }
+      });
+      const labs = memberships.map(m => m.lab);
+      res.status(200).json(labs);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch labs" });
+    }
+  },
+
   // 1. Create a Draft Lab Report
   async createReport(req: AuthRequest, res: Response) {
     try {

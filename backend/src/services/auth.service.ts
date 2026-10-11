@@ -9,7 +9,6 @@ import { z } from "zod";
 import { loginSchema, registerSchema } from "../schemas/auth.schema.js";
 import { encryptMfaSecret, decryptMfaSecret } from "../utils/crypto.js";
 import { normalizePhoneNumber } from "../utils/phone.js";
-import { SmsProvider } from "./sms.provider.js";
 
 const prisma = databaseClient.getClient();
 
@@ -42,26 +41,20 @@ export class AuthService {
   }
 
   static async register(data: z.infer<typeof registerSchema>) {
-    const isTest = env.NODE_ENV === "test";
-    const bypassVerification = isTest && (!data.phone || data.phone.startsWith("+999"));
-
     const normalizedPhone = data.phone 
       ? normalizePhoneNumber(data.phone)
-      : (isTest ? `+15555${Math.floor(100000 + Math.random() * 900000)}` : normalizePhoneNumber(data.phone!));
+      : null;
 
     if (data.email) {
       const existing = await prisma.user.findUnique({ where: { email: data.email } });
       if (existing) throw new Error("User already exists");
     }
-    const existingPhone = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
-    if (existingPhone) throw new Error("User already exists");
+    if (normalizedPhone) {
+      const existingPhone = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+      if (existingPhone) throw new Error("User already exists");
+    }
 
     const passwordHash = await this.hashPassword(data.password);
-
-    // Generate secure OTP code and its hash
-    const otp = crypto.randomInt(100000, 999999).toString();
-    const codeHash = crypto.createHash("sha256").update(otp).digest("hex");
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
     const user = await prisma.$transaction(async (tx: unknown) => {
       const txn = tx as typeof prisma;
@@ -70,7 +63,7 @@ export class AuthService {
           email: data.email ?? null,
           phone: normalizedPhone,
           passwordHash,
-          status: bypassVerification ? AccountStatus.ACTIVE : AccountStatus.PENDING_VERIFICATION,
+          status: AccountStatus.ACTIVE,
         },
       });
 
@@ -83,16 +76,6 @@ export class AuthService {
         },
       });
 
-      if (!bypassVerification) {
-        await txn.phoneVerification.create({
-          data: {
-            userId: newUser.id,
-            codeHash,
-            expiresAt,
-          }
-        });
-      }
-
       await txn.auditLog.create({
         data: {
           actorUserId: newUser.id,
@@ -101,29 +84,8 @@ export class AuthService {
         },
       });
 
-      if (!bypassVerification) {
-        await txn.auditLog.create({
-          data: {
-            actorUserId: newUser.id,
-            action: AuditAction.PHONE_VERIFICATION_REQUESTED,
-            metadata: { phone: normalizedPhone },
-          },
-        });
-      }
-
       return newUser;
     });
-
-    if (!bypassVerification) {
-      // Send the OTP via SmsProvider
-      await SmsProvider.sendOtp(normalizedPhone, otp);
-
-      return {
-        verificationRequired: true,
-        userId: user.id,
-        message: "Verification code sent to your phone"
-      };
-    }
 
     return { user: { id: user.id, email: user.email, phone: user.phone, status: user.status, roles: ["PATIENT"] } };
   }
@@ -145,7 +107,9 @@ export class AuthService {
       where: query,
       include: {
         patientProfile: true,
-        doctorProfile: true
+        doctorProfile: true,
+        hospitalMemberships: true,
+        labMemberships: true
       }
     });
 
@@ -163,10 +127,6 @@ export class AuthService {
         },
       });
       throw new Error("Invalid credentials");
-    }
-
-    if (user.status === AccountStatus.PENDING_VERIFICATION) {
-      return { verificationRequired: true, userId: user.id };
     }
 
     if (user.status !== AccountStatus.ACTIVE) {
@@ -223,6 +183,16 @@ export class AuthService {
     const roles: string[] = [];
     if (user.patientProfile) roles.push("PATIENT");
     if (user.doctorProfile) roles.push("DOCTOR");
+    if (user.hospitalMemberships && user.hospitalMemberships.length > 0) {
+      for (const m of user.hospitalMemberships) {
+        if (!roles.includes(m.role)) roles.push(m.role);
+      }
+    }
+    if (user.labMemberships && user.labMemberships.length > 0) {
+      for (const m of user.labMemberships) {
+        if (!roles.includes(m.role)) roles.push(m.role);
+      }
+    }
     if (roles.length === 0) roles.push("PATIENT");
 
     return {
@@ -253,7 +223,9 @@ export class AuthService {
       where: { id: decoded.sub },
       include: {
         patientProfile: true,
-        doctorProfile: true
+        doctorProfile: true,
+        hospitalMemberships: true,
+        labMemberships: true
       }
     });
 
@@ -270,7 +242,7 @@ export class AuthService {
       }
       const secret = decryptMfaSecret(user.mfaSecret);
       const mfaRes = await verifyTotp({ token: code, secret });
-      isVerified = mfaRes.valid;
+      isVerified = typeof mfaRes === "boolean" ? mfaRes : Boolean((mfaRes as { valid?: boolean })?.valid);
     } else {
       // Check backup codes
       const hashedInput = crypto.createHash("sha256").update(code).digest("hex");
@@ -326,6 +298,16 @@ export class AuthService {
     const roles: string[] = [];
     if (user.patientProfile) roles.push("PATIENT");
     if (user.doctorProfile) roles.push("DOCTOR");
+    if (user.hospitalMemberships && user.hospitalMemberships.length > 0) {
+      for (const m of user.hospitalMemberships) {
+        if (!roles.includes(m.role)) roles.push(m.role);
+      }
+    }
+    if (user.labMemberships && user.labMemberships.length > 0) {
+      for (const m of user.labMemberships) {
+        if (!roles.includes(m.role)) roles.push(m.role);
+      }
+    }
     if (roles.length === 0) roles.push("PATIENT");
 
     return {
@@ -369,7 +351,7 @@ export class AuthService {
 
     const secret = decryptMfaSecret(user.mfaSecretPending);
     const mfaRes = await verifyTotp({ token: code, secret });
-    const isVerified = mfaRes.valid;
+    const isVerified = typeof mfaRes === "boolean" ? mfaRes : Boolean((mfaRes as { valid?: boolean })?.valid);
 
     if (!isVerified) {
       throw new Error("Invalid verification code");
@@ -812,171 +794,5 @@ export class AuthService {
         metadata: { scope: "ALL" },
       },
     });
-  }
-
-  static async verifyPhone(userId: string, otp: string, metadata?: any) {
-    const codeHash = crypto.createHash("sha256").update(otp).digest("hex");
-
-    return prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({
-        where: { id: userId },
-        include: {
-          patientProfile: true,
-          doctorProfile: true
-        }
-      });
-
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      if (user.status !== AccountStatus.PENDING_VERIFICATION) {
-        throw new Error("Account is already verified or active");
-      }
-
-      // Find the latest unverified verification entry
-      const verification = await tx.phoneVerification.findFirst({
-        where: { userId, verifiedAt: null },
-        orderBy: { createdAt: "desc" }
-      });
-
-      if (!verification) {
-        throw new Error("Verification code is invalid");
-      }
-
-      if (verification.expiresAt < new Date()) {
-        throw new Error("Verification code has expired");
-      }
-
-      if (verification.attempts >= 5) {
-        throw new Error("Too many verification attempts. Please request a new code");
-      }
-
-      if (verification.codeHash !== codeHash) {
-        await tx.phoneVerification.update({
-          where: { id: verification.id },
-          data: { attempts: { increment: 1 } }
-        });
-
-        await tx.auditLog.create({
-          data: {
-            actorUserId: userId,
-            action: AuditAction.PHONE_VERIFICATION_FAILED,
-            metadata: { reason: "Invalid code", attempts: verification.attempts + 1 }
-          }
-        });
-
-        throw new Error("Invalid verification code");
-      }
-
-      // Successful verification
-      await tx.phoneVerification.update({
-        where: { id: verification.id },
-        data: { verifiedAt: new Date() }
-      });
-
-      const updatedUser = await tx.user.update({
-        where: { id: userId },
-        data: { status: AccountStatus.ACTIVE }
-      });
-
-      await tx.auditLog.create({
-        data: {
-          actorUserId: userId,
-          action: AuditAction.PHONE_VERIFICATION_SUCCESS,
-          metadata: { phone: updatedUser.phone }
-        }
-      });
-
-      // Establish session
-      const { token: refreshToken, hash: refreshTokenHash } = this.generateRefreshToken();
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-      const session = await tx.authSession.create({
-        data: {
-          userId: user.id,
-          refreshTokenHash,
-          expiresAt,
-          familyId: crypto.randomUUID(),
-          metadata,
-        },
-      });
-
-      const accessToken = this.generateAccessToken(user.id, session.id);
-
-      await tx.auditLog.create({
-        data: {
-          actorUserId: user.id,
-          action: AuditAction.LOGIN,
-          metadata: { sessionId: session.id }
-        }
-      });
-
-      const roles: string[] = ["PATIENT"];
-
-      return {
-        accessToken,
-        refreshToken,
-        user: { id: updatedUser.id, email: updatedUser.email, phone: updatedUser.phone, status: updatedUser.status, roles }
-      };
-    });
-  }
-
-  static async resendPhoneOtp(userId: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
-    if (!user) {
-      return { success: true, message: "If the account is pending verification, a new code has been sent." };
-    }
-
-    if (user.status !== AccountStatus.PENDING_VERIFICATION) {
-      return { success: true, message: "If the account is pending verification, a new code has been sent." };
-    }
-
-    const latest = await prisma.phoneVerification.findFirst({
-      where: { userId, verifiedAt: null },
-      orderBy: { createdAt: "desc" }
-    });
-
-    if (latest) {
-      const diffMs = Date.now() - latest.createdAt.getTime();
-      const cooldownMs = 60 * 1000;
-      if (diffMs < cooldownMs) {
-        throw new Error("Please wait 60 seconds before requesting a new code.");
-      }
-    }
-
-    const otp = crypto.randomInt(100000, 999999).toString();
-    const codeHash = crypto.createHash("sha256").update(otp).digest("hex");
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-    await prisma.$transaction(async (tx) => {
-      await tx.phoneVerification.updateMany({
-        where: { userId, verifiedAt: null },
-        data: { expiresAt: new Date(0) }
-      });
-
-      await tx.phoneVerification.create({
-        data: {
-          userId,
-          codeHash,
-          expiresAt
-        }
-      });
-
-      await tx.auditLog.create({
-        data: {
-          actorUserId: userId,
-          action: AuditAction.PHONE_VERIFICATION_RESENT,
-          metadata: { phone: user.phone }
-        }
-      });
-    });
-
-    await SmsProvider.sendOtp(user.phone!, otp);
-
-    return { success: true, message: "Verification code resent successfully" };
   }
 }

@@ -26,10 +26,10 @@ export default function LabReportsPage() {
       setLoading(true);
       let lId = labId;
       if (!lId) {
-        const lRes = await fetchWithAuth("/lab/memberships");
-        const memberships = await lRes.json();
-        if (memberships && memberships.length > 0) {
-          lId = memberships[0].labId;
+        const lRes = await fetchWithAuth("/labs");
+        const labs = await lRes.json();
+        if (Array.isArray(labs) && labs.length > 0) {
+          lId = labs[0].id;
           setLabId(lId);
         }
       }

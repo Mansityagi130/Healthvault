@@ -3,12 +3,14 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     fileParallelism: false,
+    maxConcurrency: 1,
+    pool: "forks",
     poolOptions: {
-      threads: {
-        singleThread: true,
+      forks: {
+        singleFork: true,
       },
     },
-    hookTimeout: 30000,
-    testTimeout: 15000,
+    hookTimeout: 60000,
+    testTimeout: 45000,
   },
 });

@@ -33,6 +33,9 @@ describe("Red-Team Security Hardening Tests (Step 31)", () => {
       email,
       password: "Password123!"
     });
+    if (!loginRes.body || !loginRes.body.user) {
+      throw new Error(`Failed to login user ${email}: ${JSON.stringify(loginRes.body)}`);
+    }
     return {
       id: loginRes.body.user.id,
       accessToken: loginRes.body.accessToken,

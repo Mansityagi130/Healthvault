@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchWithAuth, getAccessToken } from "@/lib/api-client";
+import { fetchWithAuth, getAccessToken, API_URL } from "@/lib/api-client";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -256,7 +256,7 @@ export default function RecordDetailPage({ params }: { params: Promise<{ recordI
                       size="sm" 
                       onClick={async () => {
                         const token = getAccessToken();
-                        const res = await fetch(`/api/patient/documents/${doc.id}`, {
+                        const res = await fetch(`${API_URL}/patient/documents/${doc.id}`, {
                           headers: { "Authorization": `Bearer ${token}` }
                         });
                         if (res.ok) {

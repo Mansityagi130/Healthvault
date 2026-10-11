@@ -14,6 +14,7 @@ router.use(authenticate);
 // The requireRole middleware might be tied to global user roles, but Membership roles are separate.
 // The verifyLabMembership function inside the controller checks the specific labId.
 
+router.get("/", LabController.getLabs);
 router.post("/:labId/associations/consume", LabAssociationController.consumePairingToken);
 router.get("/:labId/associations", LabAssociationController.listLabAssociations);
 

@@ -123,7 +123,7 @@ export class SharingService {
       });
 
       return { session, qrSession };
-    });
+    }, { timeout: 30000 });
 
     // Return the raw token ONLY ONCE. It is never stored.
     return {
