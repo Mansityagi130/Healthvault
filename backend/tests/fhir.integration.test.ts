@@ -18,6 +18,7 @@ describe('FHIR Interoperability (Step 27B)', () => {
   let encounterId: string;
 
   beforeAll(async () => {
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "User", "Hospital", "Lab" CASCADE;`);
     // 1. Setup Patient via API
     await request(app).post('/api/auth/register').send({ email: 'fhir-pat@example.com', password: 'Password1!', firstName: 'Fhir', lastName: 'Pat', role: 'PATIENT' });
     const pRes = await request(app).post('/api/auth/login').send({ email: 'fhir-pat@example.com', password: 'Password1!' });
@@ -42,7 +43,6 @@ describe('FHIR Interoperability (Step 27B)', () => {
 
     const encounter = await prisma.encounter.create({
       data: {
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
         patientId, hospitalId, providerId, type: 'OUTPATIENT' as any, status: 'COMPLETED' as any, startedAt: new Date(), endedAt: new Date()
@@ -51,11 +51,8 @@ describe('FHIR Interoperability (Step 27B)', () => {
     encounterId = encounter.id;
 
     const cleanRecord = await prisma.medicalRecord.create({
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
       data: { patientId, hospitalId, category: 'CONSULTATION' as any, source: 'HOSPITAL' as any, provenanceStatus: 'HOSPITAL_CREATED' as any, occurredAt: new Date(), lifecycleStatus: 'ACTIVE' as any }
@@ -66,11 +63,8 @@ describe('FHIR Interoperability (Step 27B)', () => {
     });
 
     const infectedRecord = await prisma.medicalRecord.create({
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
       data: { patientId, hospitalId, category: 'CONSULTATION' as any, source: 'HOSPITAL' as any, provenanceStatus: 'HOSPITAL_CREATED' as any, occurredAt: new Date(), lifecycleStatus: 'ACTIVE' as any }
@@ -91,7 +85,7 @@ describe('FHIR Interoperability (Step 27B)', () => {
     if (res.status !== 200) console.log(res.body);
     expect(res.status).toBe(200);
     expect(res.body.resourceType).toBe('Bundle');
-    
+
     const entries = res.body.entry || [];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
     const patientResource = entries.find((e: any) => e.resource.resourceType === 'Patient');
@@ -126,5 +120,9 @@ describe('FHIR Interoperability (Step 27B)', () => {
     const payloadStr = JSON.stringify(res.body);
     expect(payloadStr).not.toContain('storageKey');
     expect(payloadStr).toContain('urn:uuid');
+  });
+
+  afterAll(async () => {
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "User", "Hospital", "Lab" CASCADE;`);
   });
 });

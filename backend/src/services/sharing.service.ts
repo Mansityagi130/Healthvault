@@ -1,10 +1,10 @@
 import { databaseClient } from "../config/database.js";
 import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
-import { 
-  RecordCategory, 
-  ConsentStatus, 
-  SharingSessionStatus, 
+import {
+  RecordCategory,
+  ConsentStatus,
+  SharingSessionStatus,
   QRUsageMode,
   AuditAction,
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
@@ -275,11 +275,11 @@ export class SharingService {
     // Mark QR usage atomically to prevent TOCTOU race condition
     if (qrSession.maxUses) {
       const updateResult = await prisma.qRSession.updateMany({
-        where: { 
+        where: {
           id: qrSession.id,
           useCount: { lt: qrSession.maxUses }
         },
-        data: { 
+        data: {
           useCount: { increment: 1 },
           consumedAt: now
         }
@@ -290,7 +290,7 @@ export class SharingService {
     } else {
       await prisma.qRSession.update({
         where: { id: qrSession.id },
-        data: { 
+        data: {
           useCount: { increment: 1 },
           consumedAt: now
         }

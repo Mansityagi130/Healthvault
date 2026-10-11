@@ -64,7 +64,6 @@ export class FhirService {
 
     // 3. Fetch Lab Reports
     const labRecords = await prisma.medicalRecord.findMany({
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
       where: options.tenantId ? { patientId, labId: options.tenantId, category: 'LAB_REPORT' as any } : { patientId, category: 'LAB_REPORT' as any },

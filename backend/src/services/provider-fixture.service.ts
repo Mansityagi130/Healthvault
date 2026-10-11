@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import { databaseClient } from "../config/database.js";
 import { ProfileVerificationStatus } from "../generated/prisma/enums.js";
 
@@ -5,13 +6,15 @@ const prisma = databaseClient.getClient();
 
 export class ProviderFixtureService {
   static async getDevelopmentProviders() {
+    const passwordHash = await bcrypt.hash("Password123!", 12);
+
     let doc1 = await prisma.user.findUnique({ where: { email: "dr.smith@example.com" } });
     
     if (!doc1) {
       doc1 = await prisma.user.create({
         data: {
           email: "dr.smith@example.com",
-          passwordHash: "mocked_hash",
+          passwordHash,
           doctorProfile: {
             create: {
               registrationNumber: "LIC-12345",
@@ -28,7 +31,7 @@ export class ProviderFixtureService {
       doc2 = await prisma.user.create({
         data: {
           email: "dr.jones@example.com",
-          passwordHash: "mocked_hash",
+          passwordHash,
           doctorProfile: {
             create: {
               registrationNumber: "LIC-67890",

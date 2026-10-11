@@ -56,11 +56,10 @@ router.get('/patient/:patientId/\\$export', fhirExportLimiter, async (req: Reque
     const options: any = { isPatientOrigin: patientProfile && patientProfile.id === patientId };
     if (tenantId) options.tenantId = tenantId;
     if (providerId) options.providerId = providerId;
-    
+
     const bundle = await FhirService.getPatientBundle(patientId, options);
 
     res.status(200).json(bundle);
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Next.js / React temporary strictness disable
   } catch (error: unknown) {

@@ -1,4 +1,20 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/$/, "");
+export const API_URL = rawApiUrl;
+
+export function buildUrl(endpoint: string): string {
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+
+  if (API_URL.endsWith("/api") && cleanEndpoint.startsWith("/api/")) {
+    const base = API_URL.slice(0, -4);
+    return `${base}${cleanEndpoint}`;
+  }
+
+  if (!API_URL.endsWith("/api") && !cleanEndpoint.startsWith("/api/")) {
+    return `${API_URL}/api${cleanEndpoint}`;
+  }
+
+  return `${API_URL}${cleanEndpoint}`;
+}
 
 let memoryAccessToken: string | null = null;
 export const setAccessToken = (token: string | null) => { memoryAccessToken = token; };
@@ -13,11 +29,11 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {})
       "Content-Type": "application/json",
       ...options.headers,
     },
-    credentials: "include", 
+    credentials: "include",
   };
 
   const accessToken = getAccessToken();
-  
+
   if (accessToken) {
     config.headers = {
       ...config.headers,
@@ -25,15 +41,15 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {})
     };
   }
 
-  let response = await fetch(`${API_URL}${endpoint}`, config);
+  let response = await fetch(buildUrl(endpoint), config);
 
-  // If 401, we should attempt to refresh. 
+  // If 401, we should attempt to refresh.
   // We exclude the /auth/refresh and /auth/login endpoints from triggering a refresh loop.
   if (response.status === 401 && !endpoint.includes("/auth/refresh") && !endpoint.includes("/auth/login") && !endpoint.includes("/auth/register")) {
     if (!refreshPromise) {
       refreshPromise = (async () => {
         try {
-          const refreshResponse = await fetch(`${API_URL}/auth/refresh`, {
+          const refreshResponse = await fetch(buildUrl("/auth/refresh"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
@@ -64,7 +80,7 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {})
         ...config.headers,
         Authorization: `Bearer ${newAccessToken}`,
       };
-      response = await fetch(`${API_URL}${endpoint}`, config);
+      response = await fetch(buildUrl(endpoint), config);
     }
   }
 

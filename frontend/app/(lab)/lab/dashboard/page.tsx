@@ -1,19 +1,38 @@
 "use client";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Next.js / React temporary strictness disable
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Next.js / React temporary strictness disable
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Next.js / React temporary strictness disable
 import { fetchWithAuth } from "@/lib/api-client";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Next.js / React temporary strictness disable
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FlaskConical, FileText, Activity } from "lucide-react";
 
 export default function LabDashboard() {
-  // Normally we would fetch real stats from /api/labs/:labId/stats
+  const [stats, setStats] = useState<{ draftCount: number; pendingOrdersCount: number; finalizedTodayCount: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const labsRes = await fetchWithAuth("/labs");
+        const labs = await labsRes.json();
+        if (Array.isArray(labs) && labs.length > 0) {
+          const statsRes = await fetchWithAuth(`/labs/${labs[0].id}/stats`);
+          if (statsRes.ok) {
+            const data = await statsRes.json();
+            setStats(data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load lab stats", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStats();
+  }, []);
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -38,7 +57,7 @@ export default function LabDashboard() {
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-500">Draft Reports</p>
-                <p className="text-2xl font-bold text-slate-900">12</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <p className="text-2xl font-bold text-slate-900">{stats?.draftCount ?? 0}</p>}
               </div>
             </div>
           </CardContent>
@@ -51,7 +70,7 @@ export default function LabDashboard() {
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-500">Pending Tests</p>
-                <p className="text-2xl font-bold text-slate-900">8</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <p className="text-2xl font-bold text-slate-900">{stats?.pendingOrdersCount ?? 0}</p>}
               </div>
             </div>
           </CardContent>
@@ -64,7 +83,7 @@ export default function LabDashboard() {
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-500">Finalized Today</p>
-                <p className="text-2xl font-bold text-slate-900">45</p>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <p className="text-2xl font-bold text-slate-900">{stats?.finalizedTodayCount ?? 0}</p>}
               </div>
             </div>
           </CardContent>

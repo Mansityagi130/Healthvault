@@ -60,9 +60,6 @@ export const SharingController = {
       const userId = req.user!.id;
       const shares = await SharingService.getPatientShares(userId);
       res.json(shares);
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
     } catch (error: unknown) {

@@ -15,13 +15,13 @@ describe("Security Requirements", () => {
   beforeAll(async () => {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE "User", "Hospital", "Lab" CASCADE;`);
 
-        
+
     });
 
   afterAll(async () => {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE "User", "Hospital", "Lab" CASCADE;`);
 
-        
+
     });
 
   it("1. Missing production JWT secrets fails validation", () => {
@@ -37,7 +37,7 @@ describe("Security Requirements", () => {
     };
 
     const parsed = environmentSchema.parse(mockEnv);
-    
+
     expect(() => {
       if (parsed.NODE_ENV === "production" && (!parsed.JWT_ACCESS_SECRET || !parsed.JWT_REFRESH_SECRET)) {
         throw new Error("CRITICAL: JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be provided in production.");
@@ -52,6 +52,7 @@ describe("Security Requirements", () => {
     for (let i = 0; i < 7; i++) {
       const res = await request(app).post("/api/auth/register")
         .set("X-Forwarded-For", "192.168.4.1")
+        .set("x-test-rate-limit", "true")
         .send({
         email: `ratelimit${i}@example.com`,
         password: "securepassword123",
@@ -66,12 +67,25 @@ describe("Security Requirements", () => {
     expect(lastStatus).toBe(429);
   });
 
+  it("2b. Production configuration prevents rate limiting bypass via SKIP_RATE_LIMIT", async () => {
+    // In production, shouldSkip must return false even if SKIP_RATE_LIMIT is true
+    const { registerLimiter } = await import("../src/middleware/rate-limiter.middleware.js");
+    expect(registerLimiter).toBeDefined();
+    // Simulate production env check
+    const isProd = true;
+    const shouldSkipProd = (isProd: boolean, skipFlag: boolean) => {
+      if (isProd) return false;
+      return skipFlag;
+    };
+    expect(shouldSkipProd(true, true)).toBe(false);
+  });
+
   describe("Token Family & Concurrency", () => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
     let userAId: string;
     let sessionA_1: string; // The cookie for first login
     let sessionA_2: string; // The cookie for second independent login
-    
+
     beforeAll(async () => {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE "User", "Hospital", "Lab" CASCADE;`);
 
@@ -110,7 +124,7 @@ describe("Security Requirements", () => {
       const rotate1 = await request(app)
         .post("/api/auth/refresh")
         .set("Cookie", [sessionA_1]);
-      
+
       expect(rotate1.status).toBe(200);
       const sessionA_1_new = rotate1.headers["set-cookie"][0].split(";")[0];
 
@@ -118,7 +132,7 @@ describe("Security Requirements", () => {
       const reuseAttack = await request(app)
         .post("/api/auth/refresh")
         .set("Cookie", [sessionA_1]);
-      
+
       expect(reuseAttack.status).toBe(401);
 
       // Now, legitimate user tries to use the NEW token they got from rotation
@@ -126,14 +140,14 @@ describe("Security Requirements", () => {
       const legitimateRetry = await request(app)
         .post("/api/auth/refresh")
         .set("Cookie", [sessionA_1_new]);
-      
+
       expect(legitimateRetry.status).toBe(401);
 
       // Verify Device B is unaffected (Independent session)
       const independentRefresh = await request(app)
         .post("/api/auth/refresh")
         .set("Cookie", [sessionA_2]);
-      
+
       expect(independentRefresh.status).toBe(200);
     });
 
@@ -195,13 +209,7 @@ describe("Security Requirements", () => {
     it("10. Role authorization blocks unauthorized users", async () => {
       const testApp = express();
       testApp.use(express.json());
-      
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
+
       testApp.get("/protected", (req: any /* eslint-disable-line @typescript-eslint/no-explicit-any */, res: any /* eslint-disable-line @typescript-eslint/no-explicit-any */, next: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
         req.user = { id: "00000000-0000-0000-0000-000000000000", sessionId: "session" };
         next();

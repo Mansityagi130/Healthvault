@@ -1,11 +1,13 @@
 import { Router } from 'express';
-import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from '../controllers/notification.controller.js';
+import { getNotifications, getUnreadCount, getCatchupNotifications, markAsRead, markAllAsRead, streamNotifications } from '../controllers/notification.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
 router.use(authenticate);
 
+router.get('/stream', streamNotifications);
+router.get('/catchup', getCatchupNotifications);
 router.get('/', getNotifications);
 router.get('/unread-count', getUnreadCount);
 router.patch('/:id/read', markAsRead);

@@ -2,6 +2,7 @@ import { databaseClient } from '../config/database.js';
 import { backgroundQueue } from './queue.js';
 import { logger } from '../utils/logger.js';
 import { env } from '../config/env.js';
+import { AbdmService } from '../interoperability/abdm/abdm.service.js';
 
 const prisma = databaseClient.getClient();
 
@@ -9,8 +10,29 @@ const prisma = databaseClient.getClient();
 const isLocalDatabase = env.DATABASE_URL.includes('localhost') || env.DATABASE_URL.includes('127.0.0.1');
 const isLocalDevUnreachableDatabase = env.NODE_ENV === 'development' && !isLocalDatabase;
 
+let isSweepingConsents = false;
+
+export const sweepConsentsJob = async (): Promise<void> => {
+  if (isSweepingConsents) return;
+  isSweepingConsents = true;
+  try {
+    const result = await AbdmService.sweepExpiredConsents();
+    if (result.sweptCount > 0) {
+      logger.info(`[ABDM Worker] Swept ${result.sweptCount} expired consent request(s)`, { expiredIds: result.expiredIds });
+    }
+  } catch (err: unknown) {
+    logger.error('[ABDM Worker] Failed to sweep expired consent requests', { error: (err as Error).message });
+  } finally {
+    isSweepingConsents = false;
+  }
+};
+
 export const pollOutbox = async () => {
   try {
+    // 1. Run ABDM consent expiration sweep
+    await sweepConsentsJob();
+
+    // 2. Poll pending transactional outbox events
     const events = await prisma.outboxEvent.findMany({
       where: { status: 'PENDING' },
       take: 100,

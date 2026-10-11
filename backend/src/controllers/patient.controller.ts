@@ -32,9 +32,6 @@ export const PatientController = {
       });
 
       if (!profile) {
-        console.error("404 in GET: userId =", userId);
-        const all = await prisma.patientProfile.findMany();
-        console.error("All profiles in GET:", all.map(p => p.userId));
         res.status(404).json({ error: "Profile not found" });
         return;
       }
@@ -70,9 +67,6 @@ export const PatientController = {
       });
 
       if (!existingProfile) {
-        console.error("404 in PUT: userId =", userId);
-        const all = await prisma.patientProfile.findMany();
-        console.error("All profiles:", all.map(p => p.userId));
         res.status(404).json({ error: "Profile not found" });
         return;
       }

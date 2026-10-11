@@ -29,8 +29,11 @@ describe("Background Jobs, Retries, and Security integration", () => {
     });
     token = loginRes.body.accessToken;
     userId = regRes.body.user.id;
-    const profile = await prisma.patientProfile.findUnique({ where: { userId } });
-    patientId = profile!.id;
+    let profile = await prisma.patientProfile.findFirst({ where: { userId } });
+    if (!profile) {
+      profile = await prisma.patientProfile.create({ data: { userId } });
+    }
+    patientId = profile.id;
 
     const record = await prisma.medicalRecord.create({
       data: {
@@ -91,7 +94,7 @@ describe("Background Jobs, Retries, and Security integration", () => {
       .attach("file", eicarPdf, { filename: "infected.pdf", contentType: "application/pdf" });
 
     expect(res.status).toBe(201);
-    
+
     await pollOutbox();
     await processAllMockJobs();
 
@@ -104,7 +107,7 @@ describe("Background Jobs, Retries, and Security integration", () => {
       .post('/api/interoperability/abdm/consent/request')
       .set('Authorization', `Bearer ${token}`)
       .send({ abhaAddress: 'test@abdm', purpose: 'Clinical Review' });
-    
+
     expect(res.status).toBe(200);
     expect(res.body.transaction.status).toBe('REQUESTED');
 

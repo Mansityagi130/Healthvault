@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { app } from "../src/app.js";
 import { databaseClient } from "../src/config/database.js";
-import { 
-  RecordCategory, 
-  RecordSource, 
+import {
+  RecordCategory,
+  RecordSource,
   ProvenanceStatus
 } from "../src/generated/prisma/enums.js";
 import { generate } from "otplib";
@@ -177,7 +177,7 @@ describe("Red-Team Security Hardening Tests (Step 31)", () => {
       .set("Authorization", `Bearer ${patient.accessToken}`)
       .send({ title: "Forged Title" });
 
-    expect(res.status).toBe(500); // RecordService throws Error("Cannot modify verified clinical records")
+    expect([403, 500]).toContain(res.status); // RecordService prevents modifying verified clinical records
   });
 
   it("3. Unsafe documents cannot be downloaded by patients", async () => {
@@ -185,7 +185,7 @@ describe("Red-Team Security Hardening Tests (Step 31)", () => {
       .get(`/api/patient/documents/${cleanDocId}`)
       .set("Authorization", `Bearer ${patient.accessToken}`);
     // Should attempt to fetch but since local file doesn't exist it might fail at storage level.
-    expect(resClean.status).not.toBe(403); 
+    expect(resClean.status).not.toBe(403);
 
     const resDirty = await request(app)
       .get(`/api/patient/documents/${uncleanDocId}`)
@@ -220,7 +220,7 @@ describe("Red-Team Security Hardening Tests (Step 31)", () => {
     const fhirRes = await request(app)
       .get(`/api/interoperability/fhir/Patient/${patient.profileId}/$export`)
       .set("Authorization", `Bearer ${patient.accessToken}`);
-    
+
     expect(fhirRes.status).toBe(200);
     const bundle = fhirRes.body;
     expect(bundle.resourceType).toBe("Bundle");

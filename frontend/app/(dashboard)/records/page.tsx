@@ -11,8 +11,8 @@ import { FilterPopover } from "@/components/ui/FilterPopover";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Next.js / React temporary strictness disable
-import { Plus, FileText, Filter, ChevronLeft, ChevronRight, Activity, Calendar } from "lucide-react";
+import { QRCodeDisplay } from "@/components/ui/QRCodeDisplay";
+import { Plus, FileText, Filter, ChevronLeft, ChevronRight, Activity, Calendar, Download, FileArchive, X, QrCode, Copy, Check, Clock, ShieldCheck } from "lucide-react";
 
 interface RecordItem {
   id: string;
@@ -79,6 +79,108 @@ export default function RecordsPage() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
 
+  // Export Modal State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportCategory, setExportCategory] = useState("");
+  const [exportDateFrom, setExportDateFrom] = useState("");
+  const [exportDateTo, setExportDateTo] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
+
+  // QR Share Modal State (24-Hour Expiry)
+  const [showShareQrModal, setShowShareQrModal] = useState(false);
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
+  const [shareTitle, setShareTitle] = useState("");
+  const [isGeneratingShare, setIsGeneratingShare] = useState(false);
+  const [generatedShare, setGeneratedShare] = useState<{
+    id: string;
+    shareUrl: string;
+    rawToken: string;
+    expiresAt: string;
+    selector: string;
+  } | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const toggleRecordSelection = (id: string) => {
+    setSelectedRecordIds((prev) =>
+      prev.includes(id) ? prev.filter((rId) => rId !== id) : [...prev, id]
+    );
+  };
+
+  const handleGenerateShare = async () => {
+    if (selectedRecordIds.length === 0) {
+      alert("Please select at least one record to share.");
+      return;
+    }
+    setIsGeneratingShare(true);
+    try {
+      const res = await fetchWithAuth("/patient/report-shares", {
+        method: "POST",
+        body: JSON.stringify({
+          recordIds: selectedRecordIds,
+          title: shareTitle.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to generate QR share");
+      }
+      setGeneratedShare(data);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to generate QR share");
+    } finally {
+      setIsGeneratingShare(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!generatedShare) return;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const fullUrl = `${origin}${generatedShare.shareUrl}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const resetShareModal = () => {
+    setShowShareQrModal(false);
+    setSelectedRecordIds([]);
+    setShareTitle("");
+    setGeneratedShare(null);
+    setCopiedLink(false);
+  };
+
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      const payload: Record<string, string> = {};
+      if (exportCategory) payload.category = exportCategory;
+      if (exportDateFrom) payload.dateFrom = exportDateFrom;
+      if (exportDateTo) payload.dateTo = exportDateTo;
+
+      const res = await fetchWithAuth("/patient/export/pdf", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error("Failed to generate PDF export");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `healthvault-medical-history-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setShowExportModal(false);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const loadRecords = useCallback(async () => {
     setLoading(true);
     setError(false);
@@ -139,12 +241,35 @@ export default function RecordsPage() {
           <p className="text-slate-500 mt-1">Your medical history, organized in one secure place.</p>
         </div>
         
-        <Link href="/records/new">
-          <Button variant="primary" className="gap-2 w-full sm:w-auto">
-            <Plus size={16} />
-            Add Record
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2 text-teal-700 border-teal-200 hover:bg-teal-50"
+            onClick={() => {
+              setGeneratedShare(null);
+              setShowShareQrModal(true);
+            }}
+          >
+            <QrCode size={16} />
+            Share via QR
           </Button>
-        </Link>
+
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setShowExportModal(true)}
+          >
+            <Download size={16} />
+            Export Records (PDF)
+          </Button>
+
+          <Link href="/records/new">
+            <Button variant="primary" className="gap-2 w-full sm:w-auto">
+              <Plus size={16} />
+              Add Record
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -285,6 +410,255 @@ export default function RecordsPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Export Records Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b mb-4">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <FileArchive className="w-5 h-5 text-teal-600" />
+                Export Medical Records
+              </h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-4">
+              Generate a tamper-evident consolidated medical history PDF suitable for sharing with doctors or printing.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Filter by Category</label>
+                <select
+                  value={exportCategory}
+                  onChange={(e) => setExportCategory(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2 text-sm"
+                >
+                  <option value="">All Categories (Full History)</option>
+                  {CATEGORIES.filter(c => c.value !== "").map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">From Date</label>
+                  <input
+                    type="date"
+                    value={exportDateFrom}
+                    onChange={(e) => setExportDateFrom(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">To Date</label>
+                  <input
+                    type="date"
+                    value={exportDateTo}
+                    onChange={(e) => setExportDateTo(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-teal-50 border border-teal-100 rounded-lg text-xs text-teal-800">
+                All records, lab values, prescriptions, and clean attachments are authenticated via cryptographic hash stamps.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => setShowExportModal(false)} disabled={isExporting}>
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleExportPdf} disabled={isExporting}>
+                  {isExporting ? "Generating..." : "Download PDF Bundle"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Share Modal (24-Hour Expiry) */}
+      {showShareQrModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b mb-4">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-teal-600" />
+                Share Reports via QR Code
+              </h3>
+              <button
+                onClick={resetShareModal}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {!generatedShare ? (
+              <div className="space-y-4">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1">
+                  <p className="font-semibold flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-amber-600" />
+                    Strict 24-Hour Access Policy
+                  </p>
+                  <p>
+                    All QR shares automatically expire 24 hours from creation. For security and privacy, recipients must authenticate (or register) before accessing the shared documents.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                    Share Title / Label (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Recent Blood Tests & Consultation"
+                    value={shareTitle}
+                    onChange={(e) => setShareTitle(e.target.value)}
+                    maxLength={100}
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 uppercase">
+                      Select Medical Records to Share ({selectedRecordIds.length} selected)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedRecordIds.length === records.length) {
+                          setSelectedRecordIds([]);
+                        } else {
+                          setSelectedRecordIds(records.map((r) => r.id));
+                        }
+                      }}
+                      className="text-xs text-teal-700 hover:underline font-medium"
+                    >
+                      {selectedRecordIds.length === records.length ? "Deselect All" : "Select All"}
+                    </button>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-2 bg-slate-50/50">
+                    {records.length === 0 ? (
+                      <p className="text-xs text-slate-400 p-3 text-center">No records available to select.</p>
+                    ) : (
+                      records.map((record) => {
+                        const isSelected = selectedRecordIds.includes(record.id);
+                        return (
+                          <div
+                            key={record.id}
+                            onClick={() => toggleRecordSelection(record.id)}
+                            className={`p-3 rounded-lg border text-xs cursor-pointer flex items-center justify-between transition-colors ${
+                              isSelected
+                                ? "bg-teal-50 border-teal-300 text-teal-900"
+                                : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}} // handled by parent div onClick
+                                className="rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
+                              />
+                              <div className="truncate">
+                                <p className="font-semibold text-slate-900 truncate">
+                                  {record.title || `${record.category} Record`}
+                                </p>
+                                <p className="text-slate-400 text-[11px]">
+                                  {record.category} • {new Date(record.occurredAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge variant="neutral" className="shrink-0 text-[10px]">
+                              {record.provenanceStatus}
+                            </Badge>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <Button variant="outline" size="sm" onClick={resetShareModal} disabled={isGeneratingShare}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleGenerateShare}
+                    disabled={isGeneratingShare || selectedRecordIds.length === 0}
+                    className="gap-2 bg-teal-700 hover:bg-teal-800 text-white"
+                  >
+                    <QrCode size={15} />
+                    {isGeneratingShare ? "Generating..." : `Generate QR Code (${selectedRecordIds.length})`}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-center">
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 text-left">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>24-Hour QR Share Active. Recipient will be prompted to log in or register before viewing.</span>
+                </div>
+
+                <div className="py-2 flex justify-center">
+                  <QRCodeDisplay
+                    value={`${typeof window !== "undefined" ? window.location.origin : ""}${generatedShare.shareUrl}`}
+                    subtitle="Scan with camera to open secure HealthVault share link."
+                    expiresInMinutes={1440}
+                  />
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-left space-y-2">
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase">Direct Link</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${typeof window !== "undefined" ? window.location.origin : ""}${generatedShare.shareUrl}`}
+                      className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2 font-mono text-slate-700 select-all"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCopyLink}
+                      className="shrink-0 gap-1.5 text-xs text-teal-700 border-teal-200 hover:bg-teal-50"
+                    >
+                      {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedLink ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Share via WhatsApp, SMS, or email. Access expires automatically at:{" "}
+                    <span className="font-semibold text-slate-700">
+                      {new Date(generatedShare.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })},{" "}
+                      {new Date(generatedShare.expiresAt).toLocaleDateString()}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="flex justify-end pt-2 border-t border-slate-100">
+                  <Button variant="primary" size="sm" onClick={resetShareModal} className="bg-teal-700 hover:bg-teal-800 text-white">
+                    Done
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

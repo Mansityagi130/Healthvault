@@ -119,4 +119,30 @@ describe("Patient Profile Security", () => {
 
     expect(res.status).toBe(400);
   });
+
+  it("6. Patient account strictly maps 1-to-1 to PatientProfile maintaining referential integrity", async () => {
+    // Verify userA profile in DB maps directly to userA id
+    const profileA = await prisma.patientProfile.findUnique({
+      where: { userId: userA.id }
+    });
+    expect(profileA).toBeDefined();
+    expect(profileA?.userId).toBe(userA.id);
+
+    // Verify userB profile in DB maps directly to userB id
+    const profileB = await prisma.patientProfile.findUnique({
+      where: { userId: userB.id }
+    });
+    expect(profileB).toBeDefined();
+    expect(profileB?.userId).toBe(userB.id);
+
+    // Cannot create duplicate profile for same user (enforces unique constraint)
+    await expect(
+      prisma.patientProfile.create({
+        data: {
+          userId: userA.id,
+          firstName: "Duplicate"
+        }
+      })
+    ).rejects.toThrow();
+  });
 });

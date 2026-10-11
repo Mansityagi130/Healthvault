@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { AuthController } from "../controllers/auth.controller.js";
+import { AuthVerificationController } from "../controllers/auth-verification.controller.js";
 import { authenticate, requireStepUp } from "../middleware/auth.middleware.js";
-import { 
-  registerLimiter, 
-  loginLimiter, 
-  refreshLimiter, 
-  mfaVerifyLimiter, 
-  passwordResetLimiter, 
+import {
+  registerLimiter,
+  loginLimiter,
+  refreshLimiter,
+  mfaVerifyLimiter,
+  passwordResetLimiter,
   passwordChangeLimiter
 } from "../middleware/rate-limiter.middleware.js";
 
@@ -18,6 +19,9 @@ authRouter.post("/refresh", refreshLimiter, AuthController.refresh);
 authRouter.post("/forgot-password", passwordResetLimiter, AuthController.forgotPassword);
 authRouter.post("/reset-password", passwordResetLimiter, AuthController.resetPassword);
 authRouter.post("/login/mfa", mfaVerifyLimiter, AuthController.loginMfa);
+authRouter.get("/verify-email", AuthVerificationController.verifyEmail);
+authRouter.post("/verify-email", AuthVerificationController.verifyEmail);
+authRouter.post("/resend-verification", AuthVerificationController.resendVerificationEmail);
 
 // Protected routes
 authRouter.post("/logout", authenticate, AuthController.logout);

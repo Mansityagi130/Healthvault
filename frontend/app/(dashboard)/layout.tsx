@@ -3,16 +3,14 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { fetchWithAuth, setAccessToken } from "@/lib/api-client";
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Pill, 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Next.js / React temporary strictness disable
-  Stethoscope, 
-  FolderOpen, 
-  Share2, 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Next.js / React temporary strictness disable
-  AlertCircle, 
+import {
+  LayoutDashboard,
+  FileText,
+  Calendar,
+  FolderOpen,
+  Share2,
+  Pill,
+  ShieldAlert,
   Settings
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -37,7 +35,7 @@ export const useUser = () => useContext(UserContext);
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  
+
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -88,10 +86,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navItems = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
     { name: "My Records", href: "/records", icon: FileText },
+    { name: "Appointments", href: "/appointments", icon: Calendar },
     { name: "Documents", href: "/documents", icon: FolderOpen },
     { name: "Sharing & Consent", href: "/sharing", icon: Share2 },
     { name: "Lab Connections", href: "/lab-connections", icon: Pill },
-    { name: "Settings", href: "/settings/security", icon: Settings },
+    { name: "Emergency Profile", href: "/emergency", icon: ShieldAlert },
+    { name: "Settings", href: "/settings/profile", icon: Settings },
   ];
 
   if (loading) {

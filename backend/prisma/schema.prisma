@@ -20,6 +20,20 @@ enum ProfileVerificationStatus {
   REJECTED
 }
 
+enum HospitalVerificationStatus {
+  DRAFT
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
 enum MembershipRole {
   DOCTOR
   HOSPITAL_ADMIN
@@ -217,6 +231,27 @@ enum AuditAction {
   PASSWORD_RESET_REQUESTED
   PASSWORD_RESET_COMPLETED
   PASSWORD_CHANGED
+  EMERGENCY_PROFILE_UPDATED
+  EMERGENCY_QR_CREATED
+  EMERGENCY_QR_REVOKED
+  EMERGENCY_ACCESS_DENIED
+  APPOINTMENT_BOOKED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_CHECKED_IN
+  APPOINTMENT_COMPLETED
+  EMAIL_VERIFICATION_REQUESTED
+  EMAIL_VERIFIED
+  HOSPITAL_REGISTERED
+  HOSPITAL_SUBMITTED
+  HOSPITAL_VERIFIED
+  HOSPITAL_REJECTED
+  HOSPITAL_SUSPENDED
+  HOSPITAL_RESTORED
+  DOCTOR_INVITED
+  DOCTOR_INVITATION_ACCEPTED
+  DOCTOR_INVITATION_CANCELLED
 }
 
 enum NotificationType {
@@ -232,6 +267,15 @@ enum NotificationType {
   LAB_ASSOCIATION_REVOKED
   DOCUMENT_UPLOADED
   PRESCRIPTION_ADDED
+  EMERGENCY_ACCESS
+  APPOINTMENT_BOOKED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_RESCHEDULED
+  EMAIL_VERIFICATION
+  HOSPITAL_VERIFICATION_APPROVED
+  HOSPITAL_VERIFICATION_REJECTED
+  DOCTOR_INVITATION
 }
 
 enum NotificationStatus {
@@ -250,38 +294,55 @@ enum ExternalReferenceStatus {
 }
 
 model User {
-  id                  String               @id @default(uuid()) @db.Uuid
-  publicId            String               @unique @default(uuid()) @db.Uuid
-  authSubject         String?              @unique
-  email               String?              @unique
-  phone               String?              @unique
-  passwordHash        String?
-  status              AccountStatus        @default(ACTIVE)
-  mfaEnabled          Boolean              @default(false)
-  mfaSecret           String?
-  mfaBackupCodes      String[]
-  mfaSecretPending    String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  patientProfile      PatientProfile?
-  doctorProfile       DoctorProfile?
-  hospitalMemberships HospitalMembership[]
-  labMemberships      LabMembership[]
-  createdRecords      MedicalRecord[]      @relation("MedicalRecordCreator")
-  createdLabReports   LabReport[]          @relation("LabReportCreator")
-  uploadedDocuments   MedicalDocument[]    @relation("DocumentUploader")
-  consentRequests     ConsentRequest[]     @relation("ConsentRequester")
-  receivedConsents    Consent[]            @relation("ConsentGrantee")
-  revokedConsents     Consent[]            @relation("ConsentRevoker")
-  sharingSessions     SharingSession[]     @relation("SharingSessionGrantee")
-  accessLogs          AccessLog[]          @relation("AccessLogActor")
-  auditLogs           AuditLog[]           @relation("AuditLogActor")
-  notifications       Notification[]
-  externalIdentities  ExternalIdentity[]
-  authSessions        AuthSession[]
-  encounters          Encounter[]          @relation("EncounterProvider")
-  passwordResetTokens PasswordResetToken[]
-  phoneVerifications  PhoneVerification[]
+  id                      String                   @id @default(uuid()) @db.Uuid
+  publicId                String                   @unique @default(uuid()) @db.Uuid
+  authSubject             String?                  @unique
+  email                   String?                  @unique
+  phone                   String?                  @unique
+  passwordHash            String?
+  status                  AccountStatus            @default(ACTIVE)
+  isEmailVerified         Boolean                  @default(false)
+  emailVerifiedAt         DateTime?
+  isPlatformAdmin         Boolean                  @default(false)
+  mfaEnabled              Boolean                  @default(false)
+  mfaSecret               String?
+  mfaBackupCodes          String[]
+  mfaSecretPending        String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  patientProfile          PatientProfile?
+  doctorProfile           DoctorProfile?
+  hospitalMemberships     HospitalMembership[]
+  labMemberships          LabMembership[]
+  createdRecords          MedicalRecord[]          @relation("MedicalRecordCreator")
+  createdLabReports       LabReport[]              @relation("LabReportCreator")
+  uploadedDocuments       MedicalDocument[]        @relation("DocumentUploader")
+  consentRequests         ConsentRequest[]         @relation("ConsentRequester")
+  receivedConsents        Consent[]                @relation("ConsentGrantee")
+  revokedConsents         Consent[]                @relation("ConsentRevoker")
+  sharingSessions         SharingSession[]         @relation("SharingSessionGrantee")
+  accessLogs              AccessLog[]              @relation("AccessLogActor")
+  auditLogs               AuditLog[]               @relation("AuditLogActor")
+  notifications           Notification[]
+  externalIdentities      ExternalIdentity[]
+  authSessions            AuthSession[]
+  encounters              Encounter[]              @relation("EncounterProvider")
+  passwordResetTokens     PasswordResetToken[]
+  phoneVerifications      PhoneVerification[]
+  emailVerificationTokens EmailVerificationToken[]
+  claimedReportShares     PatientReportShare[]     @relation("ClaimedReportShares")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
 }
 
 model PasswordResetToken {
@@ -312,6 +373,7 @@ model PhoneVerification {
 model PatientProfile {
   id                   String                        @id @default(uuid()) @db.Uuid
   publicId             String                        @unique @default(uuid()) @db.Uuid
+  patientIdDisplay     String?                       @unique
   userId               String                        @unique @db.Uuid
   firstName            String?
   lastName             String?
@@ -335,20 +397,25 @@ model PatientProfile {
   registrationTokens   RegistrationPairingToken[]
   abdmConsents         AbdmConsent[]
   externalTransactions ExternalExchangeTransaction[]
+  appointments         Appointment[]
+  reportShares         PatientReportShare[]
 }
 
 model DoctorProfile {
   id                 String                    @id @default(uuid()) @db.Uuid
   publicId           String                    @unique @default(uuid()) @db.Uuid
+  doctorIdDisplay    String?                   @unique
   userId             String                    @unique @db.Uuid
   registrationNumber String                    @unique
   specialty          String?
+  licenseState       String?
   verificationStatus ProfileVerificationStatus @default(PENDING)
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
   user               User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
   consultations      Consultation[]
   prescriptions      Prescription[]
+  appointments       Appointment[]
 }
 
 enum HospitalStatus {
@@ -358,15 +425,24 @@ enum HospitalStatus {
 }
 
 model Hospital {
-  id                 String                    @id @default(uuid()) @db.Uuid
-  publicId           String                    @unique @default(uuid()) @db.Uuid
+  id                 String                     @id @default(uuid()) @db.Uuid
+  publicId           String                     @unique @default(uuid()) @db.Uuid
+  hospitalIdDisplay  String?                    @unique
   name               String
-  code               String                    @unique @default(uuid()) // Enforce unique code
+  code               String                     @unique @default(uuid()) // Enforce unique code
   address            Json?
-  status             HospitalStatus            @default(ACTIVE)
-  verificationStatus ProfileVerificationStatus @default(PENDING)
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
+  hfrFacilityId      String?
+  licenseNumber      String?
+  contactEmail       String?
+  contactPhone       String?
+  rejectionReason    String?
+  suspendedReason    String?
+  verifiedAt         DateTime?
+  reviewedByUserId   String?                    @db.Uuid
+  status             HospitalStatus             @default(ACTIVE)
+  verificationStatus HospitalVerificationStatus @default(DRAFT)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
   memberships        HospitalMembership[]
   departments        Department[]
   medicalRecords     MedicalRecord[]
@@ -374,6 +450,29 @@ model Hospital {
   dischargeSummaries DischargeSummary[]
   consentRequests    ConsentRequest[]
   encounters         Encounter[]
+  appointments       Appointment[]
+  invitations        HospitalInvitation[]
+}
+
+model HospitalInvitation {
+  id                  String           @id @default(uuid()) @db.Uuid
+  hospitalId          String           @db.Uuid
+  departmentId        String?          @db.Uuid
+  email               String
+  role                MembershipRole   @default(DOCTOR)
+  invitationTokenHash String           @unique
+  status              InvitationStatus @default(PENDING)
+  expiresAt           DateTime
+  invitedByUserId     String           @db.Uuid
+  acceptedByUserId    String?          @db.Uuid
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  hospital   Hospital    @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@index([hospitalId, status])
+  @@index([email, status])
 }
 
 model Department {
@@ -386,6 +485,8 @@ model Department {
   hospital    Hospital             @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
   memberships HospitalMembership[]
   encounters  Encounter[]
+  appointments Appointment[]
+  invitations  HospitalInvitation[]
 
   @@unique([hospitalId, name])
 }
@@ -910,6 +1011,7 @@ model Encounter {
   department Department?     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   provider   User?           @relation("EncounterProvider", fields: [providerId], references: [id], onDelete: SetNull)
   records    MedicalRecord[]
+  appointment Appointment?
 
   @@index([patientId, status])
   @@index([hospitalId, status])
@@ -1017,4 +1119,67 @@ enum OutboxStatus {
   PENDING
   PROCESSED
   FAILED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Appointment {
+  id              String            @id @default(uuid()) @db.Uuid
+  publicId        String            @unique @default(uuid()) @db.Uuid
+  patientId       String            @db.Uuid
+  hospitalId      String            @db.Uuid
+  departmentId    String?           @db.Uuid
+  doctorId        String?           @db.Uuid
+  encounterId     String?           @unique @db.Uuid
+  appointmentDate DateTime
+  startTime       String
+  endTime         String
+  slotTimestamp   DateTime
+  status          AppointmentStatus @default(SCHEDULED)
+  reason          String?
+  notes           String?
+  cancelledReason String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  patient    PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  hospital   Hospital       @relation(fields: [hospitalId], references: [id], onDelete: Restrict)
+  department Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  doctor     DoctorProfile? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  encounter  Encounter?     @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, status])
+  @@index([hospitalId, status])
+  @@index([doctorId, status])
+  @@index([slotTimestamp])
+}
+
+model PatientReportShare {
+  id              String         @id @default(uuid()) @db.Uuid
+  patientId       String         @db.Uuid
+  tokenHash       String         @unique
+  selector        String         @unique @default(uuid()) @db.Uuid
+  title           String?
+  recordIds       Json
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  accessCount     Int            @default(0)
+  lastAccessedAt  DateTime?
+  claimedByUserId String?        @db.Uuid
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  patient         PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  claimedByUser   User?          @relation("ClaimedReportShares", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, expiresAt])
+  @@index([tokenHash, expiresAt])
+  @@index([selector, expiresAt])
 }

@@ -9,6 +9,9 @@ import { z } from "zod";
 import { loginSchema, registerSchema } from "../schemas/auth.schema.js";
 import { encryptMfaSecret, decryptMfaSecret } from "../utils/crypto.js";
 import { normalizePhoneNumber } from "../utils/phone.js";
+import { generatePatientIdDisplay } from "../utils/id-generator.js";
+import { emailService } from "./email/email.service.js";
+import { logger } from "../utils/logger.js";
 
 const prisma = databaseClient.getClient();
 
@@ -23,9 +26,9 @@ export class AuthService {
 
   private static generateAccessToken(userId: string, sessionId: string, stepUp: boolean = false): string {
     return jwt.sign(
-      { sessionId, type: "access", stepUp }, 
-      env.JWT_ACCESS_SECRET, 
-      { 
+      { sessionId, type: "access", stepUp },
+      env.JWT_ACCESS_SECRET,
+      {
         expiresIn: "15m",
         issuer: env.JWT_ISSUER,
         audience: env.JWT_AUDIENCE,
@@ -41,7 +44,7 @@ export class AuthService {
   }
 
   static async register(data: z.infer<typeof registerSchema>) {
-    const normalizedPhone = data.phone 
+    const normalizedPhone = data.phone
       ? normalizePhoneNumber(data.phone)
       : null;
 
@@ -55,8 +58,13 @@ export class AuthService {
     }
 
     const passwordHash = await this.hashPassword(data.password);
+    const patientIdDisplay = generatePatientIdDisplay();
 
-    const user = await prisma.$transaction(async (tx: unknown) => {
+    const rawVerificationToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawVerificationToken).digest("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const result = await prisma.$transaction(async (tx: unknown) => {
       const txn = tx as typeof prisma;
       const newUser = await txn.user.create({
         data: {
@@ -64,30 +72,52 @@ export class AuthService {
           phone: normalizedPhone,
           passwordHash,
           status: AccountStatus.ACTIVE,
+          isEmailVerified: false,
         },
       });
 
-      await txn.patientProfile.create({
+      const profile = await txn.patientProfile.create({
         data: {
           userId: newUser.id,
+          patientIdDisplay,
           firstName: data.firstName,
           lastName: data.lastName,
           phone: normalizedPhone,
         },
       });
 
+      if (data.email) {
+        await txn.emailVerificationToken.create({
+          data: {
+            userId: newUser.id,
+            tokenHash,
+            expiresAt
+          }
+        });
+      }
+
       await txn.auditLog.create({
         data: {
           actorUserId: newUser.id,
           action: AuditAction.REGISTER,
-          metadata: { email: data.email, phone: normalizedPhone },
+          metadata: { email: data.email, phone: normalizedPhone, patientIdDisplay },
         },
       });
 
-      return newUser;
+      return { newUser, profile };
     });
 
-    return { user: { id: user.id, email: user.email, phone: user.phone, status: user.status, roles: ["PATIENT"] } };
+    return {
+      user: {
+        id: result.newUser.id,
+        email: result.newUser.email,
+        phone: result.newUser.phone,
+        status: result.newUser.status,
+        patientIdDisplay: result.profile.patientIdDisplay,
+        roles: ["PATIENT"]
+      },
+      verificationToken: data.email ? rawVerificationToken : undefined
+    };
   }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
@@ -250,7 +280,7 @@ export class AuthService {
       if (codeIndex !== -1) {
         isVerified = true;
         isBackupUsed = true;
-        
+
         // Consume the code
         const updatedBackupCodes = [...user.mfaBackupCodes];
         updatedBackupCodes.splice(codeIndex, 1);
@@ -425,9 +455,9 @@ export class AuthService {
 
     // Revoke all other sessions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for dynamic query filter mapping
-    const where: any = { 
-      userId, 
-      revokedAt: null 
+    const where: any = {
+      userId,
+      revokedAt: null
     };
     if (sessionId) {
       where.id = { not: sessionId };
@@ -537,7 +567,7 @@ export class AuthService {
       data: {
         topic: "NOTIFICATION",
         payload: {
-          type: "SECURITY_UPDATE",
+          type: NotificationType.SECURITY,
           userId,
           title: "Password Changed",
           message: "Your password has been successfully changed."
@@ -551,11 +581,12 @@ export class AuthService {
       console.log('[DEV] forgotPassword: Starting forgot-password flow for identity:', identity);
     }
 
+    const cleanIdentity = identity.trim();
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { email: identity },
-          { phone: identity }
+          { email: { equals: cleanIdentity, mode: "insensitive" } },
+          { phone: cleanIdentity }
         ]
       }
     });
@@ -593,7 +624,7 @@ export class AuthService {
       data: {
         topic: "NOTIFICATION",
         payload: {
-          type: "SECURITY_UPDATE",
+          type: NotificationType.SECURITY,
           userId: user.id,
           title: "Password Reset Requested",
           message: "A password reset request was initiated. Use the following link to reset your password: /reset-password?token=" + token
@@ -601,11 +632,23 @@ export class AuthService {
       }
     });
 
-    // DEVELOPMENT ONLY: Log reset URL for local testing
+    const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${token}`;
+
+    if (user.email) {
+      try {
+        await emailService.sendPasswordResetEmail({
+          to: user.email,
+          resetUrl,
+        });
+      } catch (err: unknown) {
+        logger.error(`[AuthService] Password reset email dispatch failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
     if (env.NODE_ENV === "development") {
-      const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${token}`;
       console.log(`[DEV] Password reset URL for ${user.email || user.phone}: ${resetUrl}`);
     }
+    return { token, resetUrl };
   }
 
   static async resetPassword(token: string, newPass: string) {
@@ -662,7 +705,7 @@ export class AuthService {
         data: {
           topic: "NOTIFICATION",
           payload: {
-            type: "SECURITY_UPDATE",
+            type: NotificationType.SECURITY,
             userId: resetToken.userId,
             title: "Password Reset Completed",
             message: "Your password was successfully reset. All active sessions have been logged out."
@@ -699,11 +742,11 @@ export class AuthService {
     const isRevokedOrExpired = session.revokedAt || session.expiresAt < new Date();
 
     const updateCount = await prisma.authSession.updateMany({
-      where: { 
+      where: {
         id: session.id,
         revokedAt: null
       },
-      data: { 
+      data: {
         revokedAt: new Date()
       },
     });
@@ -719,7 +762,7 @@ export class AuthService {
           revokedAt: new Date()
         }
       });
-      
+
       await prisma.auditLog.create({
         data: {
           actorUserId: session.userId,

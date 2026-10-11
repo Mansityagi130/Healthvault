@@ -1,6 +1,3 @@
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
 import { MembershipRole, EncounterType, EncounterStatus } from "../src/generated/prisma/client.js";
@@ -27,15 +24,9 @@ describe("Encounter & Clinical Context Security", () => {
 
   let hospA: unknown, hospB: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
   let deptA: unknown, deptB: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
   let adminA: unknown, adminB: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
   let docA: unknown, docB: any /* eslint-disable-line @typescript-eslint/no-explicit-any */, inactiveDoc: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
   let patA: unknown, patB: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;

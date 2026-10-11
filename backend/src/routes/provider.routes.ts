@@ -15,10 +15,12 @@ router.get("/sessions/:sessionId/records/:recordId", ProviderController.getShare
 router.get("/sessions/:sessionId/documents/:documentId", ProviderController.getSharedDocument);
 
 
-// Encounter Clinical Records
+// Encounter Clinical Records & Status Management
 router.get("/encounters", EncounterController.getProviderEncounters);
+router.patch("/encounters/:encounterId", EncounterController.updateProviderEncounter);
 router.post("/encounters/:encounterId/consultations", ClinicalRecordController.createConsultation);
 router.post("/encounters/:encounterId/prescriptions", ClinicalRecordController.createPrescription);
+router.post("/encounters/:encounterId/lab-orders", ClinicalRecordController.createLabOrder);
 router.get("/encounters/:encounterId/records", ClinicalRecordController.getProviderEncounterRecords);
 
 export default router;

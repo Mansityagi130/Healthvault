@@ -8,6 +8,7 @@ import { fetchWithAuth } from "@/lib/api-client";
 export default function ForgotPasswordPage() {
   const [identity, setIdentity] = useState("");
   const [message, setMessage] = useState("");
+  const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -15,6 +16,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError("");
     setMessage("");
+    setDevResetUrl(null);
     setLoading(true);
 
     try {
@@ -30,6 +32,9 @@ export default function ForgotPasswordPage() {
 
       const data = await res.json();
       setMessage(data.message || "If the account exists, password reset instructions have been sent.");
+      if (data.devResetUrl) {
+        setDevResetUrl(data.devResetUrl);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -38,7 +43,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="max-w-md w-full mx-auto p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+    <div>
       <h3 className="text-xl font-semibold text-slate-900 mb-2">Forgot Password</h3>
       <p className="text-sm text-slate-500 mb-6">
         Enter your email address or phone number, and we will send you instructions to reset your password.
@@ -52,9 +57,22 @@ export default function ForgotPasswordPage() {
 
       {message ? (
         <div className="bg-green-50 text-green-800 p-4 rounded-lg text-sm mb-6 border border-green-200">
-          {message}
-          <div className="mt-4">
-            <Link href="/login" className="font-medium text-teal-700 hover:text-teal-800">
+          <p>{message}</p>
+          {devResetUrl && (
+            <div className="mt-4 p-3 bg-white border border-green-300 rounded-lg">
+              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2">
+                Demo / Local Testing Mode
+              </p>
+              <Link
+                href={devResetUrl}
+                className="inline-flex items-center justify-center w-full py-2 px-3 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-xs font-semibold shadow-sm transition-colors"
+              >
+                Reset Password Now →
+              </Link>
+            </div>
+          )}
+          <div className="mt-4 text-center">
+            <Link href="/login" className="font-medium text-teal-700 hover:text-teal-800 text-xs">
               Return to Login
             </Link>
           </div>

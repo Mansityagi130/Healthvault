@@ -69,7 +69,7 @@ function ResetPasswordForm() {
   };
 
   return (
-    <div className="max-w-md w-full mx-auto p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+    <div>
       <h3 className="text-xl font-semibold text-slate-900 mb-2">Reset Password</h3>
       <p className="text-sm text-slate-500 mb-6">
         Enter your new secure password below.

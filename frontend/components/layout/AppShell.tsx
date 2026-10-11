@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, LogOut, ChevronDown, Bell } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
+
+import { fetchWithAuth } from "@/lib/api-client";
+import { useNotificationStream, NotificationEventPayload } from "@/lib/use-notification-stream";
 
 export interface NavItem {
   name: string;
@@ -40,33 +43,107 @@ export function AppShell({
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
-  
+
   // Notification states
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
   const [notifications, setNotifications] = useState<any[]>([]);
 
+  const loadNotifications = async () => {
+    try {
+      const [listRes, countRes] = await Promise.all([
+        fetchWithAuth("/notifications?pageSize=15"),
+        fetchWithAuth("/notifications/unread-count")
+      ]);
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const rawItems = listData.items || [];
+        // Filter out unnecessary, empty, or sensitive internal notifications
+        const filtered = rawItems
+          .map((n: any) => ({
+            ...n,
+            title: n.title || n.payload?.title || "",
+            message: n.message || n.payload?.message || "",
+          }))
+          .filter((n: any) => {
+            // Must have non-empty content
+            if (!n.title?.trim() && !n.message?.trim()) return false;
+            // Never show raw password reset token URLs in UI notifications
+            if (n.message && n.message.includes("/reset-password?token=")) return false;
+            // Only show unread notifications in this quick bell dropdown
+            if (n.readAt || n.status === "READ") return false;
+            return true;
+          });
+        setNotifications(filtered);
+      }
+      if (countRes.ok) {
+        const countData = await countRes.json();
+        setUnreadCount(countData.unreadCount || 0);
+      }
+    } catch {
+      // Keep existing notification state if network fails
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await fetchWithAuth("/notifications/read-all", { method: "POST" });
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch (err) {
+      console.error("Failed to mark all as read", err);
+    }
+  };
+
+  const handleDismissNotification = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await fetchWithAuth(`/notifications/${id}/read`, { method: "PATCH" });
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error("Failed to dismiss notification", err);
+    }
+  };
+
   useEffect(() => {
-    // In a real app, use fetchWithAuth to call /api/notifications/unread-count
-    // For this prototype, mocking the initial fetch response
-// eslint-disable-next-line react-hooks/set-state-in-effect -- Next.js / React temporary strictness disable
-    setUnreadCount(2); 
-    setNotifications([
-      { id: '1', title: 'Welcome to HealthVault', message: 'Your account is securely set up.', createdAt: new Date().toISOString(), status: 'PENDING' },
-      { id: '2', title: 'Profile Updated', message: 'Your profile information has been verified.', createdAt: new Date().toISOString(), status: 'PENDING' }
-    ]);
+    loadNotifications();
   }, []);
 
-  const userName = user?.profile?.firstName 
-    ? `${user.profile.firstName} ${user.profile.lastName}` 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isNotificationsOpen) setIsNotificationsOpen(false);
+        if (isRoleDropdownOpen) setIsRoleDropdownOpen(false);
+        if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isNotificationsOpen, isRoleDropdownOpen, isMobileMenuOpen]);
+
+  const handleStreamNotification = useCallback((event: NotificationEventPayload) => {
+    if (event.id) {
+      setUnreadCount((prev) => prev + 1);
+      loadNotifications();
+    }
+  }, []);
+
+  useNotificationStream({
+    onNotification: handleStreamNotification,
+    enabled: !!user
+  });
+
+  const userName = user?.profile?.firstName
+    ? `${user.profile.firstName} ${user.profile.lastName}`
     : user?.email || user?.phone || "User";
 
   return (
     <div className="flex min-h-screen bg-slate-50">
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -84,9 +161,10 @@ export function AppShell({
             </div>
             <span className="text-lg font-bold text-white tracking-tight">{title}</span>
           </Link>
-          <button 
+          <button
             className="ml-auto lg:hidden text-slate-400 hover:text-white"
             onClick={() => setIsMobileMenuOpen(false)}
+            aria-label="Close sidebar"
           >
             <X size={20} />
           </button>
@@ -99,11 +177,11 @@ export function AppShell({
         )}
 
         <div className="flex flex-col flex-1 overflow-y-auto p-4">
-          <nav className="space-y-1">
+          <nav className="space-y-1" aria-label="Sidebar Navigation">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isCurrent = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-              
+
               return (
                 <Link
                   key={item.name}
@@ -153,19 +231,36 @@ export function AppShell({
 
           <div className="flex items-center gap-3 px-2 py-2">
             <Avatar name={userName} className="h-9 w-9 text-xs bg-slate-700 text-slate-200 border border-slate-600" />
-            <div className="flex flex-col flex-1 min-w-0 cursor-pointer" onClick={() => roles.length > 1 && setIsRoleDropdownOpen(!isRoleDropdownOpen)}>
-              <div className="flex items-center gap-1">
+            {roles.length > 1 ? (
+              <button
+                type="button"
+                className="flex flex-col flex-1 min-w-0 text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 rounded px-1"
+                onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+                aria-expanded={isRoleDropdownOpen}
+                aria-haspopup="true"
+                aria-label="Switch active role context"
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-medium text-white truncate">{userName}</span>
+                  <ChevronDown size={14} className="text-slate-500" />
+                </div>
+                <span className="text-xs text-slate-500 truncate capitalize">
+                  {currentRole || "Patient Profile"}
+                </span>
+              </button>
+            ) : (
+              <div className="flex flex-col flex-1 min-w-0">
                 <span className="text-sm font-medium text-white truncate">{userName}</span>
-                {roles.length > 1 && <ChevronDown size={14} className="text-slate-500" />}
+                <span className="text-xs text-slate-500 truncate capitalize">
+                  {currentRole || "Patient Profile"}
+                </span>
               </div>
-              <span className="text-xs text-slate-500 truncate capitalize">
-                {currentRole || "Patient Profile"}
-              </span>
-            </div>
-            <button 
+            )}
+            <button
               onClick={onLogout}
               className="text-slate-500 hover:text-red-400 transition-colors p-1"
               title="Log out"
+              aria-label="Log out"
             >
               <LogOut size={16} />
             </button>
@@ -178,9 +273,10 @@ export function AppShell({
         {/* Topbar */}
         <header className="flex h-16 items-center px-4 sm:px-6 bg-white border-b border-slate-200 z-30 justify-between lg:justify-end shrink-0">
           <div className="flex lg:hidden items-center gap-4">
-            <button 
+            <button
               className="text-slate-500 hover:text-slate-700"
               onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Open navigation menu"
             >
               <Menu size={24} />
             </button>
@@ -195,10 +291,12 @@ export function AppShell({
           {/* Topbar Right - Actions */}
           <div className="flex items-center gap-4">
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                 className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500"
                 aria-label="View notifications"
+                aria-expanded={isNotificationsOpen}
+                aria-haspopup="true"
               >
                 <Bell size={20} />
                 {unreadCount > 0 && (
@@ -209,37 +307,57 @@ export function AppShell({
               </button>
 
               {isNotificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50">
+                <div
+                  className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50"
+                  role="region"
+                  aria-label="Notifications panel"
+                >
                   <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
-                    <h3 className="font-semibold text-slate-900">Notifications</h3>
-                    <button className="text-xs text-teal-600 hover:text-teal-700 font-medium">Mark all as read</button>
+                    <h3 className="font-semibold text-slate-900 text-sm">Notifications</h3>
+                    {notifications.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleMarkAllAsRead}
+                        className="text-xs text-teal-600 hover:text-teal-700 font-medium transition-colors"
+                      >
+                        Mark all as read
+                      </button>
+                    )}
                   </div>
-                  <div className="max-h-[400px] overflow-y-auto">
+                  <div className="max-h-[360px] overflow-y-auto">
                     {notifications.length === 0 ? (
                       <div className="p-8 text-center text-slate-500">
-                        <Bell size={32} className="mx-auto text-slate-300 mb-3" />
-                        <p className="text-sm">You&apos;re all caught up.</p>
+                        <Bell size={28} className="mx-auto text-slate-300 mb-2.5" />
+                        <p className="text-sm font-medium text-slate-700">No new notifications</p>
+                        <p className="text-xs text-slate-400 mt-0.5">You&apos;re all caught up with your records.</p>
                       </div>
                     ) : (
                       <div className="divide-y divide-slate-100">
                         {notifications.map(n => (
-                          <div key={n.id} className={`p-4 hover:bg-slate-50 transition-colors ${n.status === 'PENDING' ? 'bg-teal-50/30' : ''}`}>
+                          <div key={n.id} className="p-3.5 hover:bg-slate-50 transition-colors bg-teal-50/20">
                             <div className="flex justify-between items-start gap-2 mb-1">
-                              <h4 className="text-sm font-semibold text-slate-900">{n.title}</h4>
-                              <span className="text-[10px] text-slate-400 shrink-0">
-                                {new Date(n.createdAt).toLocaleDateString()}
-                              </span>
+                              <h4 className="text-sm font-medium text-slate-900 pr-2">{n.title}</h4>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[10px] text-slate-400">
+                                  {new Date(n.createdAt).toLocaleDateString()}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDismissNotification(n.id, e)}
+                                  className="text-slate-400 hover:text-slate-600 p-0.5 rounded hover:bg-slate-200 transition-colors"
+                                  title="Dismiss notification"
+                                >
+                                  <X size={13} />
+                                </button>
+                              </div>
                             </div>
-                            <p className="text-sm text-slate-600 line-clamp-2">{n.message}</p>
+                            {n.message && (
+                              <p className="text-xs text-slate-600 line-clamp-2">{n.message}</p>
+                            )}
                           </div>
                         ))}
                       </div>
                     )}
-                  </div>
-                  <div className="p-3 border-t border-slate-100 bg-slate-50 text-center">
-                    <Link href="#" className="text-sm font-medium text-teal-600 hover:text-teal-700">
-                      View all activity
-                    </Link>
                   </div>
                 </div>
               )}

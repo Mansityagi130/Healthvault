@@ -14,23 +14,23 @@ import { ChevronLeft, FileText, Pill, Calendar, Lock, CheckCircle, Clock } from 
 export default function EncounterWorkspace() {
   const params = useParams();
   const router = useRouter();
-  
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
   const [encounter, setEncounter] = useState<any>(null);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [showConsultForm, setShowConsultForm] = useState(false);
   const [showRxForm, setShowRxForm] = useState(false);
-  
+
   const [consultData, setConsultData] = useState({
     chiefComplaint: "",
     clinicalNotes: "",
     assessment: "",
     plan: ""
   });
-  
+
   const [rxData, setRxData] = useState({
     instructions: "",
     medicationName: "",
@@ -118,13 +118,18 @@ export default function EncounterWorkspace() {
   const completeEncounter = async () => {
     if (!confirm("Are you sure? Completing this encounter will lock the records and prevent further editing.")) return;
     try {
-      // In a real app we'd have an endpoint to transition to COMPLETED.
-      // Mocking the completion for the UI state if the backend doesn't support direct provider completion yet
+      const res = await fetchWithAuth(`/provider/encounters/${encounter.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "COMPLETED" })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to complete encounter");
+      }
       alert("Encounter completed securely.");
-      // Just reload
       loadData();
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      alert(e.message || "Failed to complete encounter");
     }
   };
 
@@ -150,7 +155,7 @@ export default function EncounterWorkspace() {
 
   return (
     <div className="flex flex-col lg:flex-row h-full gap-6">
-      
+
       {/* LEFT PANEL: Patient/Context/History */}
       <div className="w-full lg:w-1/3 flex flex-col gap-6 lg:border-r lg:border-slate-200 lg:pr-6 shrink-0 h-auto lg:h-[calc(100vh-8rem)] lg:overflow-y-auto">
         <div className="flex items-center gap-2">

@@ -54,11 +54,11 @@ export const processAllMockJobs = async () => {
   }
 };
 
-const isLocalDevUnreachableRedis = env.NODE_ENV === 'development' && (env.REDIS_URL.includes('red-') || env.REDIS_URL.includes('render'));
+const isLocalDevUnreachableRedis = (env.NODE_ENV === 'development' && (process.env.SKIP_REDIS === 'true' || env.REDIS_URL.includes('red-') || env.REDIS_URL.includes('render') || process.env.USE_MOCK_QUEUE === 'true'));
 
 if (env.NODE_ENV === 'test' || isLocalDevUnreachableRedis) {
   if (isLocalDevUnreachableRedis) {
-    logger.info('[Queue] Detected internal Render Redis URL in local development environment. Falling back to in-memory mock queue.');
+    logger.info('[Queue] Falling back to in-memory mock queue for local development.');
   }
   backgroundQueue = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

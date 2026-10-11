@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { app } from "../src/app.js";
 import { databaseClient } from "../src/config/database.js";
-import { 
+import {
   RecordCategory
 } from "../src/generated/prisma/enums.js";
 import { generate } from "otplib";
@@ -79,7 +79,7 @@ describe("End-to-End Release Demo Verification Flow", () => {
       password: "Password123!"
     });
     const doctorToken = doctorLogin.body.accessToken;
-    
+
     await prisma.doctorProfile.create({
       data: {
         userId: doctorUser.body.user.id,
@@ -113,7 +113,7 @@ describe("End-to-End Release Demo Verification Flow", () => {
       .send({ expiresInMinutes: 15 });
     console.log("Token Response status:", tokenRes.status, "body:", tokenRes.body);
     expect(tokenRes.status).toBe(201);
-    
+
     // Consume pairing token
     const consumeRes = await request(app)
       .post(`/api/hospitals/${hospital.id}/registration/consume`)
@@ -206,7 +206,7 @@ describe("End-to-End Release Demo Verification Flow", () => {
       .send({ selector: associationTokenRes.body.selector, token: associationTokenRes.body.token });
     expect(assocConsume.status).toBe(200);
     const associationId = assocConsume.body.associationId;
-    
+
     // Patient approves lab association
     const approveAssoc = await request(app)
       .post("/api/patient/lab-associations/approve")

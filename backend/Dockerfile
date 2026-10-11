@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 # Copy package descriptors first for caching
 COPY package*.json ./
 RUN npm ci
+COPY prisma.config.ts ./
 
 # Copy Prisma schema, source, and TS config before generating client
 COPY prisma ./prisma
@@ -39,6 +40,7 @@ ENV NODE_ENV=production
 # Copy package files and install production dependencies only
 COPY package*.json ./
 RUN npm ci --omit=dev
+COPY prisma.config.ts ./
 
 # Copy compiled files and prisma schema from builder stage
 COPY --from=builder /app/dist ./dist

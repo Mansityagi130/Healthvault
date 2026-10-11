@@ -19,7 +19,7 @@ export const createPrismaClient = (connectionString: string): PrismaClient => {
     connectionString,
     max: 20, // Connection limits
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 15000, // 15 seconds to accommodate remote DB (Neon) cold-start and TLS handshakes
+    connectionTimeoutMillis: 30000, // 30 seconds to accommodate remote DB (Neon) cold-start, pooler latency, and TLS handshakes
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
   });
@@ -45,12 +45,27 @@ class PrismaDatabaseClient {
       throw new DatabaseConfigurationError("DATABASE_URL is not configured.");
     }
 
+    if (env.NODE_ENV === "test") {
+      try {
+        const parsed = new URL(env.DATABASE_URL);
+        const dbName = parsed.pathname.replace(/^\//, "");
+        if (!dbName.endsWith("_test") && !dbName.includes("test")) {
+          throw new DatabaseConfigurationError(
+            `[CRITICAL SAFETY GUARD] Refusing to connect to non-test database "${dbName}" in test environment! Tests must target a test database ending in "_test".`
+          );
+        }
+      } catch (err: unknown) {
+        if (err instanceof DatabaseConfigurationError) throw err;
+      }
+    }
+
     this.client = createPrismaClient(env.DATABASE_URL);
     return this.client;
   }
 
   public async disconnect(): Promise<void> {
     await this.client?.$disconnect();
+    this.client = undefined;
   }
 }
 

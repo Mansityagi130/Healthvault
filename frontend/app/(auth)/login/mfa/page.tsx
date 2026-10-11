@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { fetchWithAuth, setAccessToken } from "@/lib/api-client";
+import { getSafeRedirectUrl } from "@/lib/redirect-utils";
 
 export default function MfaLoginPage() {
   const router = useRouter();
@@ -44,6 +45,16 @@ export default function MfaLoginPage() {
       sessionStorage.removeItem("pendingMfaToken");
       setAccessToken(data.accessToken);
 
+      const pendingRedirect = sessionStorage.getItem("pendingRedirect");
+      if (pendingRedirect) {
+        sessionStorage.removeItem("pendingRedirect");
+        const safe = getSafeRedirectUrl(pendingRedirect);
+        if (safe) {
+          router.push(safe);
+          return;
+        }
+      }
+
       const roles = data.user?.roles || [];
       if (roles.includes("DOCTOR")) {
         router.push("/provider/dashboard");
@@ -58,7 +69,7 @@ export default function MfaLoginPage() {
   };
 
   return (
-    <div className="max-w-md w-full mx-auto p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+    <div>
       <h3 className="text-xl font-semibold text-slate-900 mb-2">Two-Factor Authentication</h3>
       <p className="text-sm text-slate-500 mb-6">
         Enter the 6-digit verification code from your authenticator app, or a backup recovery code.

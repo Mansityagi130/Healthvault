@@ -2,17 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { app } from "../src/app.js";
 import { databaseClient } from "../src/config/database.js";
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
 import { RecordCategory, RecordLifecycleStatus, RecordSource, ProvenanceStatus } from "../src/generated/prisma/enums.js";

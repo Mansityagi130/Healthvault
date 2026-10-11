@@ -4,17 +4,20 @@ import { LabAssociationController } from "../controllers/lab-association.control
 import { authenticate } from "../middleware/auth.middleware.js";
 
 
+import { LabOnboardingController } from "../controllers/lab-onboarding.controller.js";
+
 const router = Router();
 
-// Ensure all lab routes are authenticated and require LAB_USER or LAB_ADMIN
+// Public / Unauthenticated Lab Self-Registration Endpoint
+router.post("/register", LabOnboardingController.registerLab);
+
+// Protect all remaining lab routes
 router.use(authenticate);
 
-// We will rely on the controller logic for fine-grained lab membership verification,
-// but we can ensure they have at least one lab role globally.
-// The requireRole middleware might be tied to global user roles, but Membership roles are separate.
-// The verifyLabMembership function inside the controller checks the specific labId.
-
 router.get("/", LabController.getLabs);
+router.post("/:labId/invitations", LabOnboardingController.inviteStaff);
+router.get("/:labId/stats", LabController.getStats);
+
 router.post("/:labId/associations/consume", LabAssociationController.consumePairingToken);
 router.get("/:labId/associations", LabAssociationController.listLabAssociations);
 

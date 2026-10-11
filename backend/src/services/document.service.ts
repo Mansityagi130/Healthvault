@@ -1,5 +1,5 @@
 import { databaseClient } from "../config/database.js";
-import { storage } from "./storage/LocalStorageProvider.js";
+import { storage } from "./storage/StorageFactory.js";
 import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
@@ -21,8 +21,8 @@ function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
     return buffer.length > 4 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
   }
   if (mimeType === "image/webp") {
-    return buffer.length > 12 && 
-           buffer.toString("ascii", 0, 4) === "RIFF" && 
+    return buffer.length > 12 &&
+           buffer.toString("ascii", 0, 4) === "RIFF" &&
            buffer.toString("ascii", 8, 12) === "WEBP";
   }
   return false;
@@ -106,7 +106,7 @@ export class DocumentService {
         });
 
         return newDoc;
-      });
+      }, { timeout: 30000 });
     } catch (err) {
       await storage.delete(quarantineKey);
       throw err;
@@ -165,6 +165,38 @@ export class DocumentService {
       metadata: document,
       buffer,
     };
+  }
+
+  static async listDocuments(userId: string) {
+    const profile = await prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new Error("Profile not found");
+
+    const documents = await prisma.medicalDocument.findMany({
+      where: {
+        medicalRecord: {
+          patientId: profile.id,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        medicalRecordId: true,
+        originalFilename: true,
+        mimeType: true,
+        byteSize: true,
+        securityStatus: true,
+        verificationStatus: true,
+        createdAt: true,
+        uploadedAt: true,
+      },
+    });
+
+    return documents.map(doc => ({
+      ...doc,
+      byteSize: doc.byteSize.toString(),
+    }));
   }
 }
 

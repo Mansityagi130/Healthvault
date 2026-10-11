@@ -34,23 +34,31 @@ export default function DashboardPage() {
   const [records, setRecords] = useState<any[]>([]);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
   const [encounters, setEncounters] = useState<any[]>([]);
+  const [totalRecords, setTotalRecords] = useState<number>(0);
+  const [emergencyProfile, setEmergencyProfile] = useState<{ bloodGroup?: string; isActive?: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadDashboardData() {
       try {
-        const [recordsRes, encountersRes] = await Promise.all([
+        const [recordsRes, encountersRes, emergencyRes] = await Promise.all([
           fetchWithAuth("/patient/records?limit=5"),
-          fetchWithAuth("/patient/encounters?limit=5")
+          fetchWithAuth("/patient/encounters?limit=5"),
+          fetchWithAuth("/emergency/profile")
         ]);
         
         if (recordsRes.ok) {
           const recData = await recordsRes.json();
           setRecords(recData.items || []);
+          setTotalRecords(recData.pagination?.total ?? (recData.items?.length || 0));
         }
         if (encountersRes.ok) {
           const encData = await encountersRes.json();
-          setEncounters(encData.items || []);
+          setEncounters(Array.isArray(encData) ? encData : encData.items || []);
+        }
+        if (emergencyRes.ok) {
+          const emerData = await emergencyRes.json();
+          setEmergencyProfile(emerData);
         }
       } catch (err) {
         console.error(err);
@@ -61,14 +69,20 @@ export default function DashboardPage() {
     loadDashboardData();
   }, []);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
+  const [greeting, setGreeting] = useState("Welcome");
+  const [mounted, setMounted] = useState(false);
 
-  const displayName = user?.profile?.firstName || user?.email?.split('@')[0] || user?.phone || "Patient";
+  useEffect(() => {
+    setMounted(true);
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting("Good morning");
+    else if (hour < 18) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
+  }, []);
+
+  const displayName = mounted
+    ? (user?.profile?.firstName || user?.email?.split('@')[0] || user?.phone || "Patient")
+    : "Patient";
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -76,7 +90,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-            {getGreeting()}, <span className="capitalize">{displayName}</span>
+            {greeting}, <span className="capitalize">{displayName}</span>
           </h1>
           <p className="text-slate-500 mt-1">Your health records, securely organized and accessible.</p>
         </div>
@@ -106,7 +120,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Total Records</p>
-              {loading ? <Skeleton className="h-8 w-16 mt-1" /> : <h4 className="text-2xl font-bold text-slate-900 mt-1">{records.length > 0 ? `${records.length}+` : 0}</h4>}
+              {loading ? <Skeleton className="h-8 w-16 mt-1" /> : <h4 className="text-2xl font-bold text-slate-900 mt-1">{totalRecords}</h4>}
             </div>
           </CardContent>
         </Card>
@@ -123,20 +137,35 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         
-        <Card>
-          <CardContent className="p-6 flex items-start gap-4">
-            <div className="p-3 rounded-xl bg-red-50 text-red-600">
-              <ShieldAlert size={24} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">Emergency Profile</p>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-slate-300"></span>
-                <span className="text-sm font-medium text-slate-600">Not setup</span>
+        <Link href="/emergency" className="block group">
+          <Card className="transition-all hover:shadow-md cursor-pointer border-slate-200">
+            <CardContent className="p-6 flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-red-50 text-red-600 group-hover:bg-red-100 transition-colors">
+                <ShieldAlert size={24} />
               </div>
-            </div>
-          </CardContent>
-        </Card>
+              <div>
+                <p className="text-sm font-medium text-slate-500">Emergency Profile</p>
+                <div className="mt-1 flex items-center gap-2">
+                  {loading ? (
+                    <Skeleton className="h-4 w-20" />
+                  ) : emergencyProfile && emergencyProfile.isActive ? (
+                    <>
+                      <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="text-sm font-semibold text-slate-800">
+                        Active {emergencyProfile.bloodGroup ? `(${emergencyProfile.bloodGroup})` : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-flex h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+                      <span className="text-sm font-medium text-slate-600">Setup required</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { fetchWithAuth, setAccessToken } from "../../../lib/api-client";
+import { getSafeRedirectUrl } from "../../../lib/redirect-utils";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -38,18 +42,31 @@ export default function LoginPage() {
       }
 
       if (data.verificationRequired) {
-        router.push(`/register/verify?userId=${data.userId}`);
+        const verifyUrl = redirectParam
+          ? `/register/verify?userId=${data.userId}&redirect=${encodeURIComponent(redirectParam)}`
+          : `/register/verify?userId=${data.userId}`;
+        router.push(verifyUrl);
         return;
       }
 
       if (data.mfaRequired) {
         sessionStorage.setItem("pendingMfaToken", data.mfaToken);
+        if (redirectParam) {
+          sessionStorage.setItem("pendingRedirect", redirectParam);
+        }
         router.push("/login/mfa");
         return;
       }
 
       setAccessToken(data.accessToken);
-      
+
+      // Prioritize validated safe redirect URL (e.g. for QR shared reports)
+      const safeRedirect = getSafeRedirectUrl(redirectParam);
+      if (safeRedirect) {
+        router.push(safeRedirect);
+        return;
+      }
+
       const roles = data.user?.roles || [];
       if (roles.includes("HOSPITAL_ADMIN") || roles.includes("HOSPITAL_STAFF")) {
         router.push("/hospital/dashboard");
@@ -71,10 +88,14 @@ export default function LoginPage() {
     }
   };
 
+  const registerHref = redirectParam
+    ? `/register?redirect=${encodeURIComponent(redirectParam)}`
+    : "/register";
+
   return (
     <div>
       <h3 className="text-xl font-semibold text-slate-900 mb-6">Sign in to your account</h3>
-      
+
       {error && (
         <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-6 border border-red-200">
           {error}
@@ -139,10 +160,18 @@ export default function LoginPage() {
 
       <div className="mt-6 text-center text-sm">
         <span className="text-slate-500">Don&apos;t have an account? </span>
-        <Link href="/register" className="font-medium text-teal-700 hover:text-teal-800">
+        <Link href={registerHref} className="font-medium text-teal-700 hover:text-teal-800">
           Register now
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="py-8 text-center text-slate-500"><Loader2 className="animate-spin h-6 w-6 mx-auto mb-2" />Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

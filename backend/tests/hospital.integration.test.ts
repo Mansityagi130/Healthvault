@@ -16,11 +16,11 @@ describe("Organization & Tenant Security", () => {
   beforeAll(async () => {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE "User", "Hospital", "Lab" CASCADE;`);
 
-    
-    
-    
-    
-    
+
+
+
+
+
     const resA = await request(app).post("/api/auth/register").send({
       email: "docA@orgtest.com", password: "securepassword123", firstName: "Doc", lastName: "A"
     });
@@ -43,7 +43,7 @@ describe("Organization & Tenant Security", () => {
     deptA = await prisma.department.create({ data: { hospitalId: hospA.id, name: "Cardiology", code: "CARD-A" } });
 
     await prisma.hospitalMembership.create({
-      data: { hospitalId: hospA.id, departmentId: deptA.id, userId: docA.id, role: MembershipRole.DOCTOR, status: MembershipStatus.ACTIVE }
+      data: { hospitalId: hospA.id, departmentId: deptA.id, userId: docA.id, role: MembershipRole.HOSPITAL_ADMIN, status: MembershipStatus.ACTIVE }
     });
     await prisma.hospitalMembership.create({
       data: { hospitalId: hospB.id, userId: docB.id, role: MembershipRole.HOSPITAL_ADMIN, status: MembershipStatus.ACTIVE }
@@ -53,11 +53,11 @@ describe("Organization & Tenant Security", () => {
   afterAll(async () => {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE "User", "Hospital", "Lab" CASCADE;`);
 
-    
-    
-    
-    
-    
+
+
+
+
+
     });
 
   it("1. Hospital Admin A cannot view Hospital B members", async () => {

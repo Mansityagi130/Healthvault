@@ -73,5 +73,21 @@ export const DocumentController = {
         res.status(500).json({ error: "Failed to download document" });
       }
     }
+  },
+
+  async list(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user!.id;
+      const documents = await DocumentService.listDocuments(userId);
+      res.status(200).json(documents);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
+    } catch (error: any) {
+      if (error.message === "Profile not found") {
+        res.status(404).json({ error: "Profile not found" });
+      } else {
+        console.error("List Documents Error:", error);
+        res.status(500).json({ error: "Failed to fetch documents" });
+      }
+    }
   }
 };

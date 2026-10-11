@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { fetchWithAuth } from "@/lib/api-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Loader2, Shield, Lock, CheckCircle2, AlertTriangle, Key } from "lucide-react";
+import { Loader2, Shield, Lock, CheckCircle2, AlertTriangle, Key, User, Clock } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function SecuritySettingsPage() {
@@ -228,6 +229,27 @@ export default function SecuritySettingsPage() {
         <p className="text-slate-500 text-sm mt-1">
           Manage your account password and configure Multi-Factor Authentication (MFA) settings.
         </p>
+      </div>
+
+      <div className="flex space-x-2 border-b border-slate-200">
+        <Link
+          href="/settings/profile"
+          className="pb-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2"
+        >
+          <User className="w-4 h-4" /> Personal Profile
+        </Link>
+        <Link
+          href="/settings/security"
+          className="pb-3 px-4 font-semibold text-sm border-b-2 border-teal-600 text-teal-700 flex items-center gap-2"
+        >
+          <Shield className="w-4 h-4" /> Security & Passwords
+        </Link>
+        <Link
+          href="/settings/security/audit"
+          className="pb-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2"
+        >
+          <Clock className="w-4 h-4" /> Audit Trail
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

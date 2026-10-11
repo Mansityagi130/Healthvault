@@ -122,10 +122,15 @@ describe("MFA & Password Reset Integration Tests", () => {
   });
 
   it("6. Successful MFA login", async () => {
+    const loginRes = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "usera@example.com", password: "Password123!" });
+    const freshMfaToken = loginRes.body.mfaToken;
+
     const code = await generate({ secret: mfaSecretA });
     const res = await request(app)
       .post("/api/auth/login/mfa")
-      .send({ mfaToken: pendingMfaToken, code });
+      .send({ mfaToken: freshMfaToken, code });
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("accessToken");
@@ -184,7 +189,7 @@ describe("MFA & Password Reset Integration Tests", () => {
       .post("/api/auth/step-up/verify")
       .set("Authorization", `Bearer ${userAToken}`)
       .send({ password: "Password123!", code: await generate({ secret: mfaSecretA }) });
-    
+
     expect(stepUpRes.status).toBe(200);
     const stepUpToken = stepUpRes.body.stepUpToken;
 
@@ -290,7 +295,7 @@ describe("MFA & Password Reset Integration Tests", () => {
     });
 
     const token = extractTokenFromOutbox(outbox!.payload);
-    
+
     // Hash token to verify DB has hash only
     const hashed = crypto.createHash("sha256").update(token).digest("hex");
     const dbToken = await prisma.passwordResetToken.findFirst({
@@ -443,11 +448,12 @@ describe("MFA & Password Reset Integration Tests", () => {
   it("21. Rate limiting check", async () => {
     // Make multiple quick login attempts with X-Forwarded-For 192.168.4.1
     const promises = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 110; i++) {
       promises.push(
         request(app)
           .post("/api/auth/login")
           .set("X-Forwarded-For", "192.168.4.1")
+          .set("x-test-rate-limit", "true")
           .send({ email: "usera@example.com", password: "WrongPassword" })
       );
     }
@@ -509,6 +515,7 @@ describe("MFA & Password Reset Integration Tests", () => {
     // Check normal access with userB token (who logged in after password reset)
     const loginB = await request(app)
       .post("/api/auth/login")
+      .set("X-Forwarded-For", "10.0.0.1")
       .send({ email: "userb@example.com", password: "FullyRevokedPassword123!" });
     userBToken = loginB.body.accessToken;
 

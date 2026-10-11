@@ -2,16 +2,16 @@ import type { Response } from "express";
 import type { AuthRequest } from "../middleware/auth.middleware.js";
 import { databaseClient } from "../config/database.js";
 const prisma = databaseClient.getClient();
-import { 
-  createLabReportSchema, 
+import {
+  createLabReportSchema,
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
   updateLabReportSchema,
   addLabResultSchema,
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
   updateLabResultSchema
 } from "../schemas/lab.schema.js";
-import { 
-  RecordSource, 
+import {
+  RecordSource,
   ProvenanceStatus,
   RecordCategory,
   MembershipRole,
@@ -364,6 +364,47 @@ export const LabController = {
         res.status(403).json({ error: error.message });
       } else {
         res.status(400).json({ error: error.message });
+      }
+    }
+  },
+
+  async getStats(req: AuthRequest, res: Response) {
+    try {
+      const user = req.user!;
+      const labId = req.params.labId as string;
+      await verifyLabMembership(user.id, labId);
+
+      const draftCount = await prisma.labReport.count({
+        where: { labId, status: LabReportStatus.DRAFT }
+      });
+
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const finalizedTodayCount = await prisma.labReport.count({
+        where: {
+          labId,
+          status: LabReportStatus.FINALIZED,
+          updatedAt: { gte: startOfDay }
+        }
+      });
+
+      const totalReportsCount = await prisma.labReport.count({
+        where: { labId }
+      });
+
+      res.status(200).json({
+        draftCount,
+        pendingOrdersCount: draftCount,
+        finalizedTodayCount,
+        totalReportsCount
+      });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
+    } catch (error: any) {
+      if (error.message.startsWith("Unauthorized")) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Failed to fetch lab stats" });
       }
     }
   }

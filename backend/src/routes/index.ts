@@ -7,18 +7,28 @@ import providerRoutes from "./provider.routes.js";
 import hospitalRoutes from "./hospital.routes.js";
 import labRoutes from "./lab.routes.js";
 import notificationRoutes from "./notification.routes.js";
+import emergencyRoutes from "./emergency.routes.js";
+import appointmentRoutes from "./appointment.routes.js";
+import platformAdminRouter from "./platform-admin.routes.js";
 import fhirRoutes from "../interoperability/fhir/fhir.routes.js";
 import abdmRoutes from "../interoperability/abdm/abdm.routes.js";
+import { auditLogRouter } from "./audit-log.routes.js";
+import sharedReportsRoutes from "./shared-reports.routes.js";
 
 export const apiRouter = Router();
 
 apiRouter.use(healthRouter);
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/patient", patientRouter);
+apiRouter.use("/shared-reports", sharedReportsRoutes);
 apiRouter.use("/sharing", sharingRoutes);
 apiRouter.use("/provider", providerRoutes);
 apiRouter.use("/hospitals", hospitalRoutes);
 apiRouter.use("/labs", labRoutes);
 apiRouter.use("/notifications", notificationRoutes);
+apiRouter.use("/emergency", emergencyRoutes);
+apiRouter.use("/appointments", appointmentRoutes);
+apiRouter.use("/admin", platformAdminRouter);
 apiRouter.use("/interoperability/fhir", fhirRoutes);
 apiRouter.use("/interoperability/abdm", abdmRoutes);
+apiRouter.use("/audit-logs", auditLogRouter);

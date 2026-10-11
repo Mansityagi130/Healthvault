@@ -1,14 +1,15 @@
 import { databaseClient } from '../../config/database.js';
-import { storage } from '../../services/storage/LocalStorageProvider.js';
-import { scanner } from '../../services/scanner/MockScanner.js';
+import { storage } from '../../services/storage/StorageFactory.js';
+import { scanner } from '../../services/scanner/ScannerFactory.js';
 import type { DocumentScanJob } from '../types.js';
-import { AuditAction, DocumentSecurityStatus } from '../../generated/prisma/enums.js';
+import { AuditAction, DocumentSecurityStatus, NotificationType } from '../../generated/prisma/enums.js';
+import { notificationService } from '../../services/notification.service.js';
 
 const prisma = databaseClient.getClient();
 
 export const processDocumentScan = async (data: DocumentScanJob) => {
   const { documentId } = data;
-  
+
   const document = await prisma.medicalDocument.findUnique({
     where: { id: documentId }
   });
@@ -71,4 +72,18 @@ export const processDocumentScan = async (data: DocumentScanJob) => {
       targetId: document.id,
     }
   }).catch(() => {});
+
+  if (document.uploadedByUserId) {
+    let title = "Document Approved";
+    if (scanResult.status === 'INFECTED') title = "Document Quarantined (Infected)";
+    if (scanResult.status === 'SCAN_FAILED') title = "Document Scan Failed";
+
+    await notificationService.createNotification({
+      userId: document.uploadedByUserId,
+      type: NotificationType.DOCUMENT_UPLOADED,
+      title,
+      message: `Document '${document.originalFilename}' scan completed: ${scanResult.status}`,
+      relatedResource: { type: 'MedicalDocument', id: document.id }
+    }).catch(() => {});
+  }
 };

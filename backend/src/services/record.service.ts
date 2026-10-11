@@ -1,7 +1,7 @@
 import { databaseClient } from "../config/database.js";
-import { 
-  RecordSource, 
-  ProvenanceStatus, 
+import {
+  RecordSource,
+  ProvenanceStatus,
   AuditAction,
   AccessAction,
   AccessOutcome
@@ -21,7 +21,7 @@ export class RecordService {
   }
 
   static async listRecords(
-    userId: string, 
+    userId: string,
     query: {
       page: number;
       pageSize: number;
@@ -37,7 +37,7 @@ export class RecordService {
     }
   ) {
     const profile = await this.getPatientProfile(userId);
-    
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
     const where: any = {
       patientId: profile.id,
@@ -46,7 +46,7 @@ export class RecordService {
     if (query.category) where.category = query.category;
     if (query.provenance) where.provenanceStatus = query.provenance;
     if (query.status) where.lifecycleStatus = query.status;
-    
+
     if (query.search) {
       where.title = { contains: query.search, mode: "insensitive" };
     }
@@ -97,8 +97,8 @@ export class RecordService {
       where: { id: recordId },
       include: {
         consultation: true,
-        prescription: true,
-        labReport: true,
+        prescription: { include: { items: true } },
+        labReport: { include: { results: true } },
         imagingRecord: true,
         dischargeSummary: true,
         vaccinationRecord: true,
@@ -229,7 +229,7 @@ export class RecordService {
     await prisma.auditLog.create({
       data: {
         actorUserId: userId,
-        // Using a generic action since RECORD_UPDATED isn't in AuditAction, 
+        // Using a generic action since RECORD_UPDATED isn't in AuditAction,
         // we can use RECORD_UPLOADED or just a generic event, or skip audit if not strictly required in the enum.
         // Actually, we'll just not log audit here since RECORD_UPDATED is not in the schema enum.
         // Wait, the prompt says "RECORD_CREATED, RECORD_VIEWED, RECORD_UPDATED". Let's check if the schema enum actually has it.
@@ -244,5 +244,142 @@ export class RecordService {
     });
 
     return updated;
+  }
+
+  static async getTimeline(
+    userId: string,
+    query: {
+      category?: string;
+      search?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    }
+  ) {
+    const profile = await this.getPatientProfile(userId);
+
+    // 1. Fetch Medical Records (Consultations, Prescriptions, Lab Reports, Imaging, Discharge, Vaccination, Documents)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Query filters
+    const recordsWhere: any = { patientId: profile.id };
+    if (query.category) recordsWhere.category = query.category;
+    if (query.search) recordsWhere.title = { contains: query.search, mode: "insensitive" };
+    if (query.dateFrom || query.dateTo) {
+      recordsWhere.occurredAt = {};
+      if (query.dateFrom) recordsWhere.occurredAt.gte = new Date(query.dateFrom);
+      if (query.dateTo) recordsWhere.occurredAt.lte = new Date(query.dateTo);
+    }
+
+    const records = await prisma.medicalRecord.findMany({
+      where: recordsWhere,
+      include: {
+        consultation: { include: { doctorProfile: { include: { user: true } }, hospital: true } },
+        prescription: { include: { items: true, doctorProfile: { include: { user: true } } } },
+        labReport: { include: { lab: true, results: true } },
+        imagingRecord: true,
+        dischargeSummary: { include: { hospital: true } },
+        vaccinationRecord: true,
+        documents: true,
+        hospital: true,
+        encounter: { include: { hospital: true, department: true } }
+      },
+      orderBy: { occurredAt: "desc" }
+    });
+
+    // 2. Fetch Appointments
+    const appointments = await prisma.appointment.findMany({
+      where: { patientId: profile.id },
+      include: { hospital: true, doctor: { include: { user: true } }, department: true },
+      orderBy: { slotTimestamp: "desc" }
+    });
+
+    // 3. Fetch Emergency Access History
+    const emergencyLogs = await prisma.accessLog.findMany({
+      where: { patientId: profile.id, action: AccessAction.EMERGENCY_VIEW },
+      orderBy: { occurredAt: "desc" }
+    });
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic timeline structure
+    const timelineEvents: Array<any> = [];
+
+    for (const rec of records) {
+      let doctorName = undefined;
+      if (rec.consultation?.doctorProfile?.specialty) {
+        doctorName = `Doctor (${rec.consultation.doctorProfile.specialty})`;
+      } else if (rec.prescription?.doctorProfile?.specialty) {
+        doctorName = `Doctor (${rec.prescription.doctorProfile.specialty})`;
+      }
+
+      timelineEvents.push({
+        id: rec.id,
+        type: rec.category,
+        title: rec.title || `${rec.category} Record`,
+        timestamp: rec.occurredAt,
+        category: rec.category,
+        details: {
+          id: rec.id,
+          provenanceStatus: rec.provenanceStatus,
+          lifecycleStatus: rec.lifecycleStatus,
+          consultation: rec.consultation,
+          prescription: rec.prescription,
+          labReport: rec.labReport,
+          documents: rec.documents.map(d => ({ ...d, byteSize: d.byteSize.toString() })),
+          encounterId: rec.encounterId,
+        },
+        recordId: rec.id,
+        hospitalName: rec.hospital?.name || rec.encounter?.hospital?.name,
+        doctorName
+      });
+    }
+
+    for (const appt of appointments) {
+      const docName = appt.doctor?.specialty ? `Doctor (${appt.doctor.specialty})` : undefined;
+      timelineEvents.push({
+        id: appt.id,
+        type: "APPOINTMENT",
+        title: `Appointment: ${appt.reason || appt.status}`,
+        timestamp: appt.slotTimestamp || appt.appointmentDate,
+        category: "APPOINTMENT",
+        details: {
+          appointmentId: appt.id,
+          status: appt.status,
+          reason: appt.reason,
+          startTime: appt.startTime,
+          endTime: appt.endTime,
+          encounterId: appt.encounterId,
+        },
+        hospitalName: appt.hospital?.name,
+        doctorName: docName
+      });
+    }
+
+    for (const em of emergencyLogs) {
+      timelineEvents.push({
+        id: em.id,
+        type: "EMERGENCY_ACCESS",
+        title: "Emergency Break-Glass Access",
+        timestamp: em.occurredAt,
+        category: "EMERGENCY",
+        details: {
+          accessLogId: em.id,
+          action: em.action,
+          outcome: em.outcome,
+          reason: em.purpose || (typeof em.metadata === 'object' && em.metadata ? (em.metadata as Record<string, any>).reason : undefined) || "Emergency Break-Glass Access"
+        }
+      });
+    }
+
+    timelineEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    await prisma.accessLog.create({
+      data: {
+        actorUserId: userId,
+        patientId: profile.id,
+        resourceType: "PatientTimeline",
+        resourceId: profile.id,
+        action: AccessAction.VIEW,
+        outcome: AccessOutcome.ALLOWED,
+      }
+    });
+
+    return timelineEvents;
   }
 }

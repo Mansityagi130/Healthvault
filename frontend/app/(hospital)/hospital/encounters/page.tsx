@@ -30,12 +30,12 @@ export default function HospitalEncountersPage() {
           setHospitalId(hId);
         }
       }
-      
+
       if (hId) {
         const qs = new URLSearchParams();
         if (search) qs.set("search", search);
         if (filters.status) qs.set("status", filters.status);
-        
+
         const res = await fetchWithAuth(`/hospitals/${hId}/encounters?${qs.toString()}`);
         const data = await res.json();
         setEncounters(data.items || data || []);
@@ -85,10 +85,10 @@ export default function HospitalEncountersPage() {
       {loading ? (
         <Skeleton className="h-24 w-full" />
       ) : encounters.length === 0 ? (
-        <EmptyState 
-          icon={Building2} 
-          title={search || Object.keys(filters).length > 0 ? "No encounters match your search" : "No encounters found"} 
-          description={search || Object.keys(filters).length > 0 ? "Try adjusting your filters or search term." : "There are no encounters for this hospital."} 
+        <EmptyState
+          icon={Building2}
+          title={search || Object.keys(filters).length > 0 ? "No encounters match your search" : "No encounters found"}
+          description={search || Object.keys(filters).length > 0 ? "Try adjusting your filters or search term." : "There are no encounters for this hospital."}
         />
       ) : (
         <div className="space-y-4">

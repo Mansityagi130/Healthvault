@@ -8,9 +8,6 @@ const SENSITIVE_KEYS = [
   "token", "qrpayload", "secret", "credentials", "ssn"
 ];
 
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
 function redact(obj: any): any {

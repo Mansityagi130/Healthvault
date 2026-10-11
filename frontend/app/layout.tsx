@@ -24,23 +24,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var origSet = Element.prototype.setAttribute;
-                  Element.prototype.setAttribute = function(name, value) {
-                    if (name === 'bis_skin_checked') return;
-                    return origSet.apply(this, arguments);
-                  };
-                } catch(e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col">{children}</body>
     </html>
   );

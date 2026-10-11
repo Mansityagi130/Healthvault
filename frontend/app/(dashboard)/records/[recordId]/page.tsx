@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { ArrowLeft, Calendar, User, Activity, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Calendar, User, Activity, FileText, CheckCircle2, AlertCircle, Download, Printer, Eye } from "lucide-react";
 import { use } from "react";
 
 interface RecordDetail {
@@ -66,7 +66,7 @@ const getStatusVariant = (status: string): "success" | "neutral" | "warning" | "
 export default function RecordDetailPage({ params }: { params: Promise<{ recordId: string }> }) {
   const resolvedParams = use(params);
   const { recordId } = resolvedParams;
-  
+
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -188,12 +188,12 @@ export default function RecordDetailPage({ params }: { params: Promise<{ recordI
                 <Calendar size={14} /> Date
               </span>
               <p className="text-sm font-semibold text-slate-900">
-                {new Date(record.occurredAt).toLocaleDateString(undefined, { 
-                  weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' 
+                {new Date(record.occurredAt).toLocaleDateString(undefined, {
+                  weekday: 'short', year: 'numeric', month: 'long', day: 'numeric'
                 })}
               </p>
             </div>
-            
+
             <div className="space-y-1">
               <span className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                 <CheckCircle2 size={14} /> Provenance
@@ -249,11 +249,11 @@ export default function RecordDetailPage({ params }: { params: Promise<{ recordI
                       </p>
                     </div>
                   </div>
-                  
-                  <div className="shrink-0 flex items-center">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+
+                  <div className="shrink-0 flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={async () => {
                         const token = getAccessToken();
                         const res = await fetch(`${API_URL}/patient/documents/${doc.id}`, {
@@ -267,8 +267,63 @@ export default function RecordDetailPage({ params }: { params: Promise<{ recordI
                           alert("Failed to load document");
                         }
                       }}
+                      title="Open in new window"
                     >
-                      View
+                      <Eye size={14} className="mr-1" />
+                      Preview
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const token = getAccessToken();
+                        const res = await fetch(`${API_URL}/patient/documents/${doc.id}`, {
+                          headers: { "Authorization": `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = doc.originalFilename;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          URL.revokeObjectURL(url);
+                        } else {
+                          alert("Failed to download document");
+                        }
+                      }}
+                      title="Download original file"
+                    >
+                      <Download size={14} className="mr-1" />
+                      Download
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const token = getAccessToken();
+                        const res = await fetch(`${API_URL}/patient/documents/${doc.id}`, {
+                          headers: { "Authorization": `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const printWindow = window.open(url, "_blank");
+                          if (printWindow) {
+                            printWindow.onload = () => printWindow.print();
+                          }
+                        } else {
+                          alert("Failed to load document for printing");
+                        }
+                      }}
+                      title="Print document"
+                    >
+                      <Printer size={14} className="mr-1" />
+                      Print
                     </Button>
                   </div>
                 </div>
@@ -373,7 +428,7 @@ export default function RecordDetailPage({ params }: { params: Promise<{ recordI
           </CardContent>
         </Card>
       )}
-      
+
       <div className="text-center text-xs text-slate-400 mt-6">
         Record created on {new Date(record.createdAt).toLocaleString()}
       </div>

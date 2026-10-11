@@ -10,10 +10,11 @@ import { ArrowLeft, Save, AlertCircle } from "lucide-react";
 
 export default function NewRecordPage() {
   const router = useRouter();
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [createdRecordId, setCreatedRecordId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     category: "OTHER",
@@ -29,35 +30,39 @@ export default function NewRecordPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    
-    try {
-      // Convert YYYY-MM-DD to ISO DateTime for backend
-      const isoDate = new Date(formData.occurredAt).toISOString();
-      
-      const res = await fetchWithAuth("/patient/records", {
-        method: "POST",
-        body: JSON.stringify({
-          category: formData.category,
-          title: formData.title,
-          occurredAt: isoDate,
-        })
-      });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to create record");
+    try {
+      let targetRecordId = createdRecordId;
+
+      // Only create new record if not already created in a previous attempt
+      if (!targetRecordId) {
+        const isoDate = new Date(formData.occurredAt).toISOString();
+        const res = await fetchWithAuth("/patient/records", {
+          method: "POST",
+          body: JSON.stringify({
+            category: formData.category,
+            title: formData.title,
+            occurredAt: isoDate,
+          })
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Failed to create record");
+        }
+
+        const newRecord = await res.json();
+        targetRecordId = newRecord.id;
+        setCreatedRecordId(newRecord.id);
       }
 
-      const newRecord = await res.json();
-
-      // If there's a file, upload it to the newly created record
-      if (file) {
+      // If there's a file, upload it to the record
+      if (file && targetRecordId) {
         const uploadData = new FormData();
         uploadData.append("file", file);
-        
-        // We use fetch directly here to attach the auth header but send FormData natively
+
         const token = getAccessToken();
-        const uploadRes = await fetch(`${API_URL}/patient/records/${newRecord.id}/documents`, {
+        const uploadRes = await fetch(`${API_URL}/patient/records/${targetRecordId}/documents`, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${token}`
@@ -67,12 +72,11 @@ export default function NewRecordPage() {
 
         if (!uploadRes.ok) {
           const uploadError = await uploadRes.json();
-          // We navigate anyway but maybe could show a warning. For this step, throw so it shows error.
-          throw new Error(uploadError.error || "Record created but document upload failed");
+          throw new Error(uploadError.error || "Record created but document attachment failed. Select a valid file and try again.");
         }
       }
 
-      router.push(`/records/${newRecord.id}`);
+      router.push(`/records/${targetRecordId}`);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
@@ -174,11 +178,11 @@ export default function NewRecordPage() {
                       className="relative cursor-pointer bg-white rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-teal-500 px-2 py-1"
                     >
                       <span>Upload a file</span>
-                      <input 
-                        id="document" 
-                        name="document" 
-                        type="file" 
-                        className="sr-only" 
+                      <input
+                        id="document"
+                        name="document"
+                        type="file"
+                        className="sr-only"
                         accept="application/pdf,image/jpeg,image/png,image/webp"
                         onChange={(e) => setFile(e.target.files?.[0] || null)}
                       />

@@ -54,14 +54,14 @@ export const AuthController = {
   async login(req: Request, res: Response) {
     try {
       const data = loginSchema.parse(req.body);
-      
+
       const metadata = {
         userAgent: req.headers["user-agent"],
         ip: req.ip,
       };
 
       const result = await AuthService.login(data, metadata);
-      
+
       if (result.mfaRequired) {
         res.status(200).json({
           mfaRequired: true,
@@ -71,7 +71,7 @@ export const AuthController = {
       }
 
       setRefreshTokenCookie(res, result.refreshToken!);
-      
+
       res.status(200).json({
         accessToken: result.accessToken,
         user: result.user
@@ -175,7 +175,7 @@ export const AuthController = {
       const userId = req.user!.id;
       const sessionId = req.user!.sessionId;
       const { code, password } = req.body;
-      
+
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) {
         res.status(400).json({ error: "User not found" });
@@ -218,8 +218,17 @@ export const AuthController = {
         res.status(400).json({ error: "Email or phone is required" });
         return;
       }
-      await AuthService.forgotPassword(identity);
-      res.status(200).json({ success: true, message: "If the account exists, password reset instructions have been sent." });
+      const result = await AuthService.forgotPassword(identity);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[DEV CONTROLLER] forgotPassword result:", result);
+      }
+      const isDev = process.env.NODE_ENV === "development";
+      const devResetUrl = isDev && result?.token ? `/reset-password?token=${result.token}` : undefined;
+      res.status(200).json({
+        success: true,
+        message: "If the account exists, password reset instructions have been sent.",
+        ...(devResetUrl ? { devResetUrl } : {})
+      });
     } catch (error: unknown) {
       res.status(400).json({ error: error instanceof Error ? error.message : "Failed to initiate password reset" });
     }
@@ -249,7 +258,7 @@ export const AuthController = {
 
       const result = await AuthService.refresh(refreshToken);
       setRefreshTokenCookie(res, result.refreshToken);
-      
+
       res.status(200).json({ accessToken: result.accessToken });
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
     } catch (_error: unknown) {

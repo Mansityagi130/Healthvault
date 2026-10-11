@@ -1,6 +1,5 @@
 import * as FHIR from '../types/fhir-r4.js';
 
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 export function mapPatient(user: any, profile: any): FHIR.Patient {
@@ -29,7 +28,6 @@ export function mapPatient(user: any, profile: any): FHIR.Patient {
   return patient;
 }
 
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 export function mapPractitioner(user: any, profile?: any): FHIR.Practitioner {
@@ -168,7 +166,6 @@ export function mapMedicationRequest(prescription: any, encounterId: string, pat
   });
 }
 
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Next.js / React temporary strictness disable
 export function mapDocumentReference(document: any, patientId: string, source: any): FHIR.DocumentReference | null {

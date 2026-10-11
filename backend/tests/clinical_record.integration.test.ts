@@ -93,6 +93,7 @@ describe("Provider-Created Clinical Records", () => {
     const allIds = [providerA?.id, providerB?.id, patientA?.id, patientB?.id].filter(Boolean) as string[];
     await prisma.patientProfile.deleteMany({ where: { userId: { in: allIds } } });
     await prisma.doctorProfile.deleteMany({ where: { userId: { in: allIds } } });
+    await prisma.notification.deleteMany({ where: { userId: { in: allIds } } });
     await prisma.user.deleteMany({ where: { id: { in: allIds } } });
   });
 

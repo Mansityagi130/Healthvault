@@ -1,6 +1,3 @@
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
-// eslint-disable-next-line null -- Next.js / React temporary strictness disable
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
 import type { Encounter, EncounterStatus, EncounterType } from "../generated/prisma/client.js";
@@ -12,7 +9,7 @@ import { NotificationType } from "../generated/prisma/enums.js";
 import { notificationService } from "../services/notification.service.js";
 
 export class EncounterController {
-  
+
   // Hospital staff/admin creates encounter for patient
   static async createHospitalEncounter(req: AuthRequest, res: Response): Promise<void> {
     try {
@@ -104,7 +101,7 @@ export class EncounterController {
   static async getHospitalEncounters(req: AuthRequest, res: Response): Promise<void> {
     try {
       const hospitalId = req.params.hospitalId as string;
-      
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
       let query: any = {};
       try {
@@ -209,7 +206,7 @@ export class EncounterController {
         status: status !== undefined ? status : existing.status,
       };
 
-      if ((status === "ACTIVE" || status === "IN_PROGRESS") && 
+      if ((status === "ACTIVE" || status === "IN_PROGRESS") &&
           (existing.status !== "ACTIVE" && existing.status !== "IN_PROGRESS")) {
         updateData.startedAt = new Date();
       } else if (status === "COMPLETED") {
@@ -300,7 +297,7 @@ export class EncounterController {
         providerId: req.user!.id,
         hospitalId: { in: activeHospitalIds }
       };
-      
+
       if (query.status) where.status = query.status;
       if (query.departmentId) where.departmentId = query.departmentId;
       if (query.search) {
@@ -348,7 +345,7 @@ export class EncounterController {
       const patientProfile = await prisma.patientProfile.findUnique({
         where: { userId: req.user!.id }
       });
-      
+
       if (!patientProfile) {
         res.status(404).json({ error: "Patient profile not found" });
         return;
@@ -356,7 +353,7 @@ export class EncounterController {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
       const where: any = { patientId: patientProfile.id };
-      
+
       if (query.status) where.status = query.status;
       if (query.departmentId) where.departmentId = query.departmentId;
       if (query.search) {
@@ -379,7 +376,85 @@ export class EncounterController {
       res.status(500).json({ error: "Internal server error" });
     }
   }
+
+  // Update provider encounter status (assigned doctor)
+  static async updateProviderEncounter(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const providerUserId = req.user!.id;
+      const encounterId = req.params.encounterId as string;
+      const { status } = req.body;
+
+      const existing = await prisma.encounter.findUnique({
+        where: { id: encounterId },
+        include: {
+          hospital: { include: { memberships: { where: { userId: providerUserId, status: "ACTIVE" } } } }
+        }
+      });
+
+      if (!existing) {
+        res.status(404).json({ error: "Encounter not found" });
+        return;
+      }
+
+      if (existing.providerId !== providerUserId) {
+        res.status(403).json({ error: "Only the assigned provider can update this encounter" });
+        return;
+      }
+
+      if (existing.hospital.memberships.length === 0) {
+        res.status(403).json({ error: "Provider is not an active member of the hospital" });
+        return;
+      }
+
+      if (existing.status === "COMPLETED" || existing.status === "CANCELLED") {
+        res.status(400).json({ error: "Cannot modify a completed or cancelled encounter" });
+        return;
+      }
+
+      const validTransitions: Record<string, string[]> = {
+        "SCHEDULED": ["CHECKED_IN", "CANCELLED"],
+        "CHECKED_IN": ["IN_PROGRESS", "CANCELLED"],
+        "IN_PROGRESS": ["COMPLETED"],
+        "ACTIVE": ["COMPLETED"],
+        "COMPLETED": [],
+        "CANCELLED": []
+      };
+
+      if (status && !validTransitions[existing.status]?.includes(status)) {
+        res.status(400).json({ error: `Invalid transition from ${existing.status} to ${status}` });
+        return;
+      }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for dynamic Prisma update object
+      const updateData: any = {};
+      if (status) updateData.status = status;
+      if ((status === "IN_PROGRESS" || status === "ACTIVE") && !existing.startedAt) {
+        updateData.startedAt = new Date();
+      }
+      if (status === "COMPLETED") {
+        updateData.endedAt = new Date();
+      }
+
+      const updatedEncounter = await prisma.encounter.update({
+        where: { id: encounterId },
+        data: updateData
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: providerUserId,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AuditAction mapping
+          action: (status === "COMPLETED" ? "ENCOUNTER_COMPLETED" : "ENCOUNTER_STARTED") as any,
+          targetType: "Encounter",
+          targetId: encounterId,
+          metadata: { status }
+        }
+      });
+
+      res.json(updatedEncounter);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
 }
-
-
-

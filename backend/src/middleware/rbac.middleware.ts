@@ -58,6 +58,12 @@ export const authorizeTenant = (allowedRoles?: MembershipRole[]) => {
     }
 
     try {
+      const hospital = await prisma.hospital.findUnique({ where: { id: hospitalId } });
+      if (hospital && hospital.status === "SUSPENDED") {
+        res.status(403).json({ error: "Forbidden: Organization is suspended" });
+        return;
+      }
+
       const membership = await prisma.hospitalMembership.findFirst({
         where: {
           userId: req.user.id,
@@ -79,11 +85,31 @@ export const authorizeTenant = (allowedRoles?: MembershipRole[]) => {
       // Inject the validated membership context into the request for downstream use
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Needed for test fixtures/types
       (req as any).tenantMembership = membership;
-      
+
       next();
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }
   };
+};
+
+export const requirePlatformAdmin = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user || !user.isPlatformAdmin) {
+      res.status(403).json({ error: "Forbidden: HealthVault Platform Admin access required" });
+      return;
+    }
+
+    next();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Needed for test fixtures/types
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
 };

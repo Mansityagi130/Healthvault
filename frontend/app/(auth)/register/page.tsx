@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { fetchWithAuth } from "../../../lib/api-client";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
-  
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -16,8 +18,9 @@ export default function RegisterPage() {
     phone: "",
     password: "",
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -31,6 +34,11 @@ export default function RegisterPage() {
 
     if (!formData.email) {
       setError("Please provide an email address.");
+      return;
+    }
+
+    if (!acceptTerms) {
+      setError("Please review and agree to the Terms of Service and Privacy Notice to continue.");
       return;
     }
 
@@ -60,7 +68,10 @@ export default function RegisterPage() {
         throw new Error(data.error || "Registration failed");
       }
 
-      router.push("/login?registered=true");
+      const loginRedirect = redirectParam
+        ? `/login?registered=true&redirect=${encodeURIComponent(redirectParam)}`
+        : "/login?registered=true";
+      router.push(loginRedirect);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message || "Something went wrong. Please try again.");
@@ -72,10 +83,14 @@ export default function RegisterPage() {
     }
   };
 
+  const loginHref = redirectParam
+    ? `/login?redirect=${encodeURIComponent(redirectParam)}`
+    : "/login";
+
   return (
     <div>
       <h3 className="text-xl font-semibold text-slate-900 mb-6">Create a Patient Account</h3>
-      
+
       {error && (
         <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-6 border border-red-200">
           {error}
@@ -156,6 +171,29 @@ export default function RegisterPage() {
           </div>
         </div>
 
+        <div className="flex items-start gap-2 pt-2">
+          <input
+            type="checkbox"
+            id="acceptTerms"
+            name="acceptTerms"
+            required
+            checked={acceptTerms}
+            onChange={(e) => setAcceptTerms(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+          />
+          <label htmlFor="acceptTerms" className="text-xs text-slate-600 leading-snug cursor-pointer">
+            I agree to the{" "}
+            <Link href="/terms" target="_blank" className="text-teal-700 underline hover:text-teal-800 font-medium">
+              Terms of Service
+            </Link>{" "}
+            and acknowledge the{" "}
+            <Link href="/privacy" target="_blank" className="text-teal-700 underline hover:text-teal-800 font-medium">
+              Privacy Notice
+            </Link>
+            .
+          </label>
+        </div>
+
         <button
           type="submit"
           disabled={loading}
@@ -171,10 +209,18 @@ export default function RegisterPage() {
 
       <div className="mt-6 text-center text-sm">
         <span className="text-slate-500">Already have an account? </span>
-        <Link href="/login" className="font-medium text-teal-700 hover:text-teal-800">
+        <Link href={loginHref} className="font-medium text-teal-700 hover:text-teal-800">
           Sign in
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="py-8 text-center text-slate-500"><Loader2 className="animate-spin h-6 w-6 mx-auto mb-2" />Loading...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }
